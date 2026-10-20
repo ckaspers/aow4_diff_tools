@@ -1,0 +1,1083 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AoW4 pack diff</title>
+<style>
+:root {
+  --bg: #f6f5f1; --panel: #ffffff; --line: #dcd9d0; --text: #22211e; --dim: #6d6a62;
+  --accent: #7a4b12; --add: #1c6b3a; --add-bg: #e2f2e6; --rem: #a3261d; --rem-bg: #fbe6e3;
+  --warn: #8a5a00; --warn-bg: #fdf1d3; --code: #f0eee8; --hl-add: #b5e2c0; --hl-rem: #f4beb8;
+  --f0: #2f6fb3; --f1: #7a55b8; --f2: #2d8a7a; --f3: #9a6a1e; --f4: #b24a7a; --f5: #8b8982;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17171a; --panel: #1f1f23; --line: #34343a; --text: #e6e4de; --dim: #9a978f;
+    --accent: #e0a85a; --add: #7ed39a; --add-bg: #17301f; --rem: #f09a90; --rem-bg: #3a1c19;
+    --warn: #f0c060; --warn-bg: #3a2d10; --code: #26262b; --hl-add: #1f5a33; --hl-rem: #6e2a24;
+    --f0: #6ea8e6; --f1: #b093e6; --f2: #5fc4b2; --f3: #d8a85a; --f4: #e488b2; --f5: #8b8982;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-padding-top: 64px; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+code, pre, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12.5px; }
+header { position: sticky; top: 0; z-index: 5; background: var(--panel);
+  border-bottom: 1px solid var(--line); padding: 10px 16px;
+  display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+header h1 span { color: var(--dim); font-weight: 400; }
+#q { flex: 1 1 240px; max-width: 460px; padding: 6px 10px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
+.layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 20px;
+  max-width: 1500px; margin: 0 auto; padding: 16px; }
+aside { position: sticky; top: 64px; align-self: start; max-height: calc(100vh - 80px);
+  overflow: auto; font-size: 13px; }
+aside h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--dim); margin: 16px 0 6px; }
+aside h3:first-child { margin-top: 0; }
+aside label { display: flex; gap: 6px; align-items: center; padding: 2px 0; cursor: pointer; }
+aside label .n { margin-left: auto; color: var(--dim); font-variant-numeric: tabular-nums; }
+aside input[type=number] { width: 64px; padding: 2px 4px; border: 1px solid var(--line);
+  border-radius: 4px; background: var(--bg); color: var(--text); font: inherit; }
+aside .hint { color: var(--dim); font-size: 12px; margin: 4px 0 0; }
+aside button, .more, .status button { font: inherit; font-size: 12px; padding: 3px 9px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 5px; background: var(--panel); color: var(--text); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 12px; text-decoration: none; color: inherit; display: block; }
+.tile b { display: block; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tile span { color: var(--dim); font-size: 12px; }
+.tile.bad b { color: var(--rem); } .tile.good b { color: var(--add); } .tile.warn b { color: var(--warn); }
+.note { color: var(--dim); font-size: 12.5px; margin: 8px 0 0; }
+section { margin-top: 28px; }
+section > h2 { font-size: 16px; margin: 0 0 4px; }
+section > h2.sec { cursor: pointer; user-select: none; }
+section > h2.sec::before { content: "▾"; color: var(--dim); display: inline-block; width: 18px; font-size: 13px; }
+section > h2.sec.closed::before { content: "▸"; }
+.btn { font-size: 13px; padding: 4px 10px; border: 1px solid var(--accent); color: var(--accent); border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.warn { color: var(--warn); }
+[data-pv] { cursor: pointer; }
+[data-pv]:hover { text-decoration: underline dotted; }
+.sort { cursor: pointer; user-select: none; }
+#pivot td.old, #pivot td.new { overflow-wrap: anywhere; }
+body.drop::after { content: "Drop the .acp to check it"; position: fixed; inset: 0; z-index: 9; display: grid; place-items: center;
+  font-size: 22px; background: color-mix(in srgb, var(--bg) 85%, transparent); border: 3px dashed var(--accent); }
+nav { display: flex; gap: 4px; flex-wrap: wrap; }
+nav a { color: var(--dim); text-decoration: none; font-size: 13px; padding: 3px 8px; border-radius: 5px; }
+nav a:hover { color: var(--text); background: var(--bg); }
+section > h2 small { color: var(--dim); font-weight: 400; font-size: 13px; margin-left: 6px; }
+section h3 { font-size: 13.5px; margin: 16px 0 4px; }
+section p.lead { color: var(--dim); margin: 0 0 10px; max-width: 78ch; }
+details { background: var(--panel); border: 1px solid var(--line); border-radius: 7px; margin: 6px 0; }
+details > summary { cursor: pointer; padding: 7px 12px; list-style: none; display: flex;
+  gap: 10px; align-items: baseline; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before { content: "▸"; color: var(--dim); flex: none; width: 10px; }
+details[open] > summary::before { content: "▾"; }
+details > summary .cnt { color: var(--dim); font-variant-numeric: tabular-nums; flex: none; }
+details > summary .sub { color: var(--dim); font-size: 12.5px; margin-left: auto; text-align: right;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+details > .body { padding: 2px 12px 10px 22px; }
+details details { background: transparent; border: 0; border-top: 1px solid var(--line);
+  border-radius: 0; margin: 0; }
+details details > summary { padding: 5px 0; }
+details details > .body { padding: 0 0 8px 20px; }
+.name { font-weight: 550; overflow-wrap: anywhere; }
+.chips { display: inline-flex; gap: 5px; flex: none; }
+.chip { font-size: 11px; padding: 0 6px; border-radius: 9px; border: 1px solid currentColor; white-space: nowrap; }
+.f0 { color: var(--f0); } .f1 { color: var(--f1); } .f2 { color: var(--f2); }
+.f3 { color: var(--f3); } .f4 { color: var(--f4); } .f5 { color: var(--f5); }
+.badge { font-size: 11px; padding: 0 6px; border-radius: 4px; background: var(--warn-bg); color: var(--warn); flex: none; }
+.chg { display: grid; grid-template-columns: 8px minmax(0, 1fr); gap: 8px; padding: 2px 0; align-items: baseline; }
+.chg .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
+.chg .path .pre { color: var(--dim); }
+.chg .what { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12.5px; overflow-wrap: anywhere; }
+.add { color: var(--add); } .rem { color: var(--rem); }
+.old { color: var(--rem); } .new { color: var(--add); } .arrow { color: var(--dim); }
+pre { margin: 4px 0; padding: 8px 10px; background: var(--code); border-radius: 5px;
+  overflow-x: auto; white-space: pre; line-height: 1.4; }
+pre .l-add { background: var(--add-bg); display: block; } pre .l-rem { background: var(--rem-bg); display: block; }
+pre .l-hunk { color: var(--dim); display: block; } pre .l-ctx { display: block; }
+pre mark { color: inherit; border-radius: 2px; }
+pre .l-add mark { background: var(--hl-add); } pre .l-rem mark { background: var(--hl-rem); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+td, th { text-align: left; padding: 3px 10px 3px 0; vertical-align: top; border-top: 1px solid var(--line); }
+th { color: var(--dim); font-weight: 500; font-size: 12px; border-top: 0; }
+td.id, td.pk { color: var(--dim); } td.pk { overflow-wrap: anywhere; }
+.status { color: var(--dim); font-size: 12.5px; margin: 0 0 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.empty { color: var(--dim); padding: 8px 0; }
+.more { margin: 8px 0 2px; }
+footer { color: var(--dim); font-size: 12px; margin: 36px 0 20px; max-width: 80ch; }
+@media (max-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  aside { position: static; max-height: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>AoW4 pack diff <span id="builds"></span></h1>
+  <input id="q" type="search" placeholder="Search resource, type, pack, field or value…" autocomplete="off">
+  <label class="btn" title="Read a mod's .acp in this page and show what the update did to the resources it overrides. Dropping the file anywhere on the page works too."><input type="file" id="acp" accept=".acp" hidden>Check a mod (.acp)</label>
+  <nav id="nav">
+    <a href="#unmerged" id="navUnmerged" hidden>Not merged</a><a href="#tooltips" id="navTips" hidden>Tooltips</a><a href="#oldcontent" id="navOld" hidden>Old content</a><a href="#breaking">Breaking</a><a href="#newcontent">New</a><a href="#schema" id="navSchema">Schema</a>
+    <a href="#systemic">Systemic</a><a href="#changed">Changed</a>
+  </nav>
+</header>
+<div class="layout">
+<aside>
+  <h3>Change kinds</h3>
+  <div id="facets"></div>
+  <p class="hint">Changes each kind would list, with the other filters as they are now.</p>
+  <h3>Systemic changes</h3>
+  <label><input type="checkbox" id="hideBulk" checked> Leave them out of the detail</label>
+  <label>Repeats in at least <input type="number" id="minBulk" min="0" value="25"> resources</label>
+  <p class="hint">The same change in that many resources is listed once under Systemic changes. 0 turns grouping off.</p>
+  <h3>Group changed resources by</h3>
+  <label><input type="radio" name="group" value="type" checked> Resource type</label>
+  <label><input type="radio" name="group" value="pack"> Pack</label>
+  <h3>Content root <button id="rootsAll" type="button">all</button></h3>
+  <div id="roots"></div>
+</aside>
+<main>
+  <div class="tiles" id="tiles"></div>
+  <p class="note" id="unlisted"></p>
+  <section id="pivot" hidden></section>
+  <section id="mod" hidden></section>
+  <section id="unmerged" hidden></section>
+  <section id="tooltips" hidden></section>
+  <section id="oldcontent" hidden></section>
+  <section id="breaking"></section>
+  <section id="newcontent"></section>
+  <section id="schema"></section>
+  <section id="systemic"></section>
+  <section id="changed"></section>
+  <footer id="foot"></footer>
+</main>
+</div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script id="core">
+// ---- model logic: no DOM in this block (it is also run under node) --------
+function prepare(M) {
+  const nSig = M.sigs.length;
+  M.sigRecs = Array.from({length: nSig}, () => []);   // sig -> record indices
+  M.sigHits = new Uint32Array(nSig);                  // sig -> places it occurs
+  M.records.forEach((r, i) => {
+    r.i = i;
+    for (const c of r.c) {
+      if (c.g === undefined) continue;
+      const a = M.sigRecs[c.g];
+      if (a[a.length - 1] !== i) a.push(i);
+      M.sigHits[c.g]++;
+    }
+  });
+  // schema migrations: type -> (field + direction) -> record indices
+  M.schema = new Map();
+  M.records.forEach((r, i) => {
+    for (const c of r.c) {
+      if (!c.m) continue;
+      const byField = M.schema.get(r.t) || M.schema.set(r.t, new Map()).get(r.t);
+      const a = byField.get(c.h) || byField.set(c.h, []).get(c.h);
+      if (a[a.length - 1] !== i) a.push(i);
+    }
+  });
+  M.packRoot = M.packs.map(p => p.includes('/') ? p.slice(0, p.indexOf('/')) : '(root)');
+  M.isNewPack = new Set(M.newPacks);
+  M.isDeadPack = new Set(M.deadPacks);
+  const key = (k, a, b) => k + '|' + a + '|' + b;
+  M.recreatedNew = new Set(M.recreated.map(x => key(x[0], x[5], x[6])));
+  M.recreatedOld = new Set(M.recreated.map(x => key(x[0], x[3], x[4])));
+  M.added = M.came.filter(x => !M.isNewPack.has(x[0]) && !M.recreatedNew.has(key(x[0], x[3], x[4])));
+  M.inNewPacks = M.came.filter(x => M.isNewPack.has(x[0]));
+  M.removed = M.went.filter(x => !M.isDeadPack.has(x[0]) && !M.recreatedOld.has(key(x[0], x[3], x[4])));
+  M.inDeadPacks = M.went.filter(x => M.isDeadPack.has(x[0]));
+  M.moved = M.records.filter(r => r.mv !== undefined);
+  return M;
+}
+
+// sig -> 1 when the change repeats in minBulk or more resources
+function bulkFlags(M, minBulk) {
+  const f = new Uint8Array(M.sigs.length);
+  if (minBulk > 0) M.sigRecs.forEach((a, g) => { if (a.length >= minBulk) f[g] = 1; });
+  return f;
+}
+
+// The text report's classification: a resource is 'changed' when it has a real
+// (non-migration) change that is not a bulk one.
+function classify(M, bulk) {
+  const s = {changed: 0, opaque: 0, bulkOnly: 0, noiseOnly: 0, cls: new Uint8Array(M.records.length)};
+  M.records.forEach((r, i) => {
+    let real = 0, own = 0;
+    for (const c of r.c) {
+      if (c.m) continue;
+      real++;
+      if (c.g === undefined || !bulk[c.g]) own++;
+    }
+    if (!real) { s.noiseOnly++; s.cls[i] = 0; }
+    else if (!own) { s.bulkOnly++; s.cls[i] = 1; }
+    else { s.changed++; s.cls[i] = 2; if (r.q) s.opaque++; }
+  });
+  return s;
+}
+
+function visibleChanges(r, st, bulk) {
+  return r.c.filter(c => !c.m && st.facets.has(c.f)
+    && !(st.hideBulk && c.g !== undefined && bulk[c.g]));
+}
+
+function haystack(M, r) {
+  if (r.h === undefined) {
+    r.h = (r.n + '\n' + M.types[r.t] + '\n' + M.packs[r.k] + '\n'
+      + r.c.map(c => c.p + ' ' + (c.tp || '') + ' ' + c.d.join(' ') + (c.u ? ' not merged ' + c.u : '')).join('\n')).toLowerCase();
+  }
+  return r.h;
+}
+
+const hex8 = n => (n >>> 0).toString(16).toUpperCase().padStart(8, '0');
+const resId = (a, b) => a === null || b === null ? '' : hex8(a) + hex8(b);
+
+
+// ---- a mod's .acp, read in the page ---------------------------------------
+// The container framing only, as update_tools/lite/aow4_update_check.py reads
+// it: [count byte][(field id, offset) pairs][bodies back to back]; a set high
+// bit on the count byte means a u32 follows with the number of (u32, u32) pairs.
+function parseRecord(u8, start = 0, end = u8.length) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  const b0 = u8[start];
+  let cur = start + 1, large = 0;
+  if (b0 & 0x80) { large = dv.getUint32(cur, true); cur += 4; }
+  const pairs = [];
+  for (let i = 0; i < (b0 & 0x7f); i++, cur += 2) pairs.push([u8[cur], u8[cur + 1]]);
+  for (let i = 0; i < large; i++, cur += 8) pairs.push([dv.getUint32(cur, true), dv.getUint32(cur + 4, true)]);
+  const offs = pairs.map(p => p[1]).sort((a, b) => a - b);
+  const out = new Map();
+  for (const [fid, off] of pairs) {
+    const next = offs.find(o => o > off);
+    out.set(fid, u8.subarray(cur + off, next === undefined ? end : cur + next));
+  }
+  return out;
+}
+function recText(body) {            // a [u32 length][utf-8] string field
+  if (!body || body.length < 4) return null;
+  const n = new DataView(body.buffer, body.byteOffset, body.byteLength).getUint32(0, true);
+  return new TextDecoder().decode(body.subarray(4, 4 + n));
+}
+// -> {name, overrides: [{pack, id (16 hex), name, deleted}]}
+function modOverrides(u8) {
+  if (String.fromCharCode(...u8.subarray(0, 4)) !== 'CPR\0') throw new Error('not an .acp file');
+  const top = parseRecord(u8, 0x24);
+  const blocks = body => {          // a list: [u32 class][record holding one field named by that class]
+    const out = [];
+    const list = parseRecord(body).get(1);
+    if (!list) return out;
+    for (const entry of parseRecord(list).values()) {
+      const cls = new DataView(entry.buffer, entry.byteOffset, entry.byteLength).getUint32(0, true);
+      out.push(parseRecord(parseRecord(entry, 4).get(cls)));
+    }
+    return out;
+  };
+  const overrides = [];
+  for (const pack of top.get(38) ? blocks(top.get(38)) : []) {
+    for (const ov of pack.get(2) ? blocks(pack.get(2)) : []) {
+      // field 3: the target's identity "[#<16 hex id>]cat\row"; field 1: the
+      // stored copy. A target with no copy is the editor's "Mark Deleted".
+      const m = /^\[#([0-9A-Fa-f]{16})\]/.exec(recText(ov.get(3)) || '');
+      const raw = ov.get(1) && ov.get(1).length ? ov.get(1) : null;
+      overrides.push({pack: recText(pack.get(1)) || '', id: m ? m[1].toUpperCase() : null,
+        name: (raw && recText(parseRecord(raw, 4).get(21))) || '(unnamed)', deleted: !raw});
+    }
+  }
+  return {name: recText(top.get(21)) || '(unnamed mod)', overrides};
+}
+
+// What this update did to each resource a mod overrides. An override is a
+// whole copy of the resource as it was when the override was made, so any
+// game-side change to the original is something the copy does not have.
+const MOD_STATUS = ['gone', 'recreated', 'moved', 'changed', 'restamped', 'predates', 'fresh', 'same', 'nopack', 'unreadable'];
+// the statuses by what the modder does about them, in the order to do it
+const MOD_GROUPS = [
+  ['fix', ['gone', 'recreated', 'moved']],
+  ['reapply', ['changed']],
+  ['nothing', ['restamped', 'predates', 'fresh', 'same']],
+  ['unchecked', ['nopack', 'unreadable']],
+];
+const modGroupOf = status => MOD_GROUPS.find(([, ss]) => ss.includes(status))[0];
+function checkMod(M, mod, bulk) {
+  if (!M.byKey) {
+    const baseU = k => M.packs[k].slice(M.packs[k].lastIndexOf('/') + 1).toUpperCase();
+    M.byKey = new Map(); M.goneKey = new Map(); M.rebornKey = new Map(); M.movedKey = new Map(); M.freshKey = new Set();
+    for (const x of M.added.concat(M.inNewPacks)) if (x[3] !== null) M.freshKey.add(baseU(x[0]) + '|' + resId(x[3], x[4]));
+    M.records.forEach((r, i) => {
+      if (r.a === null) return;
+      M.byKey.set(baseU(r.k) + '|' + resId(r.a, r.b), i);
+      if (r.mv !== undefined) M.movedKey.set(baseU(r.mv) + '|' + resId(r.a, r.b), i);
+    });
+    for (const x of M.removed.concat(M.inDeadPacks)) if (x[3] !== null) M.goneKey.set(baseU(x[0]) + '|' + resId(x[3], x[4]), x);
+    for (const x of M.recreated) M.rebornKey.set(baseU(x[0]) + '|' + resId(x[3], x[4]), x);
+    M.packSet = new Set(M.allPacks);
+  }
+  return mod.overrides.map(ov => {
+    const key = ov.pack.toUpperCase() + '|' + ov.id;
+    const out = {ov, status: 'same'};
+    if (!ov.id) out.status = 'unreadable';
+    else if (M.rebornKey.has(key)) { out.status = 'recreated'; out.row = M.rebornKey.get(key); }
+    else if (M.goneKey.has(key)) { out.status = 'gone'; out.row = M.goneKey.get(key); }
+    else if (M.movedKey.has(key)) { out.status = 'moved'; out.rec = M.movedKey.get(key); }
+    else if (M.byKey.has(key)) {
+      const r = M.records[out.rec = M.byKey.get(key)];
+      // cosmetic-only differences leave the copy as good as the original;
+      // so does a re-stamped script node id (`z`), which the game never reads
+      out.status = r.c.some(c => !c.m && !c.z) ? 'changed' : r.c.some(c => c.z) ? 'restamped'
+        : r.c.length ? 'predates' : 'same';
+    } else if (M.freshKey.has(key)) out.status = 'fresh';
+    else if (!M.packSet.has(ov.pack.toUpperCase())) out.status = 'nopack';
+    return out;
+  });
+}
+
+// ---- field pivot: one field, every resource where it changed --------------
+// Keyed by the full path with list positions stripped (what a signature
+// carries), so `Entries [3] / Cost` and `Entries [7] / Cost` are one field.
+function pivotRows(M, path) {
+  if (!M.pivot) {
+    M.pivot = new Map();
+    M.records.forEach((r, i) => {
+      for (const c of r.c) {
+        if (c.g === undefined) continue;
+        const k = M.sigs[c.g][2];
+        (M.pivot.get(k) || M.pivot.set(k, []).get(k)).push([i, c]);
+      }
+    });
+  }
+  const numeric = s => /^-?\d+(\.\d+)?$/.test(s) ? parseFloat(s) : null;
+  return (M.pivot.get(path) || []).map(([i, c]) => {
+    const head = c.d[0];
+    let o = '', n = head;
+    if (c.o !== undefined) { o = c.o; n = c.n; }
+    else if (head.startsWith('+ ')) n = head.slice(2);
+    else if (head.startsWith('- ')) { o = head.slice(2); n = ''; }
+    const a = numeric(o), b = numeric(n);
+    return {i, c, o, n, delta: a !== null && b !== null ? b - a : null};
+  });
+}
+
+if (typeof module !== 'undefined') module.exports = {prepare, bulkFlags, classify, visibleChanges, haystack, resId, parseRecord, modOverrides, checkMod, MOD_GROUPS, modGroupOf, pivotRows};
+</script>
+<script>
+const M = prepare(JSON.parse(document.getElementById('data').textContent));
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const num = n => n.toLocaleString('en-US');
+const base = p => p.slice(p.lastIndexOf('/') + 1);
+const PAGE = 150;
+// wording a different kind of report replaces (override_check --html)
+const w = (k, d) => (M.words && M.words[k] !== undefined) ? M.words[k] : d;
+
+const st = {q: '', facets: new Set(M.facets.map((_, i) => i).filter(i => M.facets[i] !== 'undecoded')),
+  hideBulk: true, minBulk: w('minBulk', 25), group: 'type', roots: null,
+  modOnly: false,
+  open: {pivot: true, mod: true, unmerged: true, tooltips: true, oldcontent: true, breaking: true, newcontent: true, schema: false, systemic: true, changed: true}};
+let bulk, cls;
+
+// ---- lazily filled <details> ---------------------------------------------
+const lazy = new Map();
+let lazyId = 0;
+function det(summary, fill, {cls: c = '', open = false} = {}) {
+  const id = ++lazyId;
+  lazy.set(id, fill);
+  return `<details class="${c}" data-lz="${id}"${open ? ' open' : ''}><summary>${summary}</summary><div class="body"></div></details>`;
+}
+function fillLazy(d) {
+  const id = +d.dataset.lz, fn = lazy.get(id);
+  if (!fn) return;
+  lazy.delete(id);
+  fn(d.lastElementChild);
+  d.lastElementChild.querySelectorAll('details[open][data-lz]').forEach(fillLazy);
+}
+document.addEventListener('toggle', e => {
+  if (e.target.open && e.target.dataset && e.target.dataset.lz) fillLazy(e.target);
+}, true);
+function setHtml(el, html) {
+  el.innerHTML = html;
+  el.querySelectorAll('details[open][data-lz]').forEach(fillLazy);
+}
+function setSection(id, html) {      // html = <h2>…</h2> then the body
+  const el = $('#' + id);
+  el.innerHTML = html;
+  const h2 = el.firstElementChild, body = document.createElement('div');
+  while (h2.nextSibling) body.appendChild(h2.nextSibling);
+  el.appendChild(body);
+  const show = () => { h2.classList.toggle('closed', !st.open[id]); body.hidden = !st.open[id]; };
+  h2.classList.add('sec');
+  h2.onclick = () => { st.open[id] = !st.open[id]; show(); };
+  show();
+  el.querySelectorAll('details[open][data-lz]').forEach(fillLazy);
+}
+function paged(el, items, rowHtml, wrap) {
+  let pos = 0;
+  const host = wrap ? wrap(el) : el;
+  const more = document.createElement('button');
+  more.className = 'more'; more.type = 'button';
+  const step = () => {
+    const end = Math.min(items.length, pos + PAGE);
+    let h = '';
+    for (; pos < end; pos++) h += rowHtml(items[pos]);
+    if (host === el) more.insertAdjacentHTML('beforebegin', h);
+    else host.insertAdjacentHTML('beforeend', h);
+    host.querySelectorAll('details[open][data-lz]').forEach(fillLazy);
+    if (pos >= items.length) more.remove();
+    else more.textContent = `Show ${num(Math.min(PAGE, items.length - pos))} more (${num(items.length - pos)} remaining)`;
+  };
+  more.onclick = step;
+  el.appendChild(more);
+  step();
+}
+function table(head) {
+  return el => {
+    el.insertAdjacentHTML('afterbegin', `<table><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody></tbody></table>`);
+    return $('tbody', el);
+  };
+}
+
+// ---- filters ---------------------------------------------------------------
+const rootOk = k => !st.roots || st.roots.has(M.packRoot[k]);
+const textOk = (...parts) => !st.q || parts.join('\n').toLowerCase().includes(st.q);
+const rowOk = x => rootOk(x[0]) && textOk(x[1], M.types[x[2]], M.packs[x[0]]);
+
+// ---- pieces ----------------------------------------------------------------
+function pathHtml(p) {
+  const i = p.lastIndexOf(' / ');
+  return i < 0 ? esc(p) : `<span class="pre">${esc(p.slice(0, i + 3))}</span>${esc(p.slice(i + 3))}`;
+}
+function whatHtml(c) {
+  const head = c.d[0];
+  if (c.o !== undefined) {
+    const note = head.includes('  (') ? ` <span class="arrow">${esc(head.slice(head.lastIndexOf('  (')).trim())}</span>` : '';
+    return `<span class="old">${esc(c.o)}</span> <span class="arrow">→</span> <span class="new">${esc(c.n)}</span>${note}`;
+  }
+  if (head.startsWith('+ ')) return `<span class="add">${esc(head)}</span>`;
+  if (head.startsWith('- ')) return `<span class="rem">${esc(head)}</span>`;
+  return esc(head);
+}
+function miniDiff(lines) {      // continuation lines: marker in column 2
+  return '<pre>' + lines.map(l => {
+    const m = l[2];
+    return `<span class="${m === '+' ? 'l-add' : m === '-' ? 'l-rem' : 'l-ctx'}">${esc(l.slice(2)) || ' '}</span>`;
+  }).join('') + '</pre>';
+}
+function intraline(a, b) {      // common prefix / suffix of a removed + added pair
+  let p = 1;                    // column 0 is the -/+ marker
+  const n = Math.min(a.length, b.length);
+  while (p < n && a[p] === b[p]) p++;
+  let s = 0;
+  while (s < n - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s++;
+  const cut = (t, cl) => `<span class="${cl}">${esc(t.slice(0, p))}<mark>${esc(t.slice(p, t.length - s))}</mark>${esc(t.slice(t.length - s))}</span>`;
+  return [cut(a, 'l-rem'), cut(b, 'l-add')];
+}
+function scriptDiff(lines) {
+  let h = '';
+  for (let i = 0; i < lines.length;) {
+    const l = lines[i];
+    if (l[0] === '-') {
+      let j = i; while (j < lines.length && lines[j][0] === '-') j++;
+      let k = j; while (k < lines.length && lines[k][0] === '+') k++;
+      if (j - i === k - j) {
+        const pairs = [];
+        for (let x = 0; x < j - i; x++) pairs.push(intraline(lines[i + x], lines[j + x]));
+        h += pairs.map(p => p[0]).join('') + pairs.map(p => p[1]).join('');
+      } else {
+        for (let x = i; x < k; x++) h += `<span class="${lines[x][0] === '-' ? 'l-rem' : 'l-add'}">${esc(lines[x])}</span>`;
+      }
+      i = k;
+    } else {
+      h += `<span class="${l[0] === '+' ? 'l-add' : l.startsWith('@@') ? 'l-hunk' : 'l-ctx'}">${esc(l) || ' '}</span>`;
+      i++;
+    }
+  }
+  return `<pre>${h}</pre>`;
+}
+const isBulk = c => c.g !== undefined && !!bulk[c.g];
+function changeHtml(c, sys = false) {
+  return `<div class="chg"><span class="dot f${c.f}" title="${M.facets[c.f]}"></span><div><span class="path"${c.g !== undefined ? ` data-pv="${c.g}"` : ''} title="${esc(c.tp || c.p)}${c.g !== undefined ? ' — click for every resource where this field changed' : ''}">${pathHtml(c.p)}</span>: <span class="what">${whatHtml(c)}</span>${c.ob ? ' <span class="badge" title="The new build has no name for this field. Shown as the old build reads it, on both sides.">dropped by the new build</span>' : ''}${sys ? ' <span class="badge" title="The same change was made to many resources: listed once under Systemic changes.">systemic</span>' : ''}${c.u ? ` <span class="badge" style="color:var(--warn);background:var(--warn-bg);border-color:var(--warn)" title="The game made this change in ${esc(c.u)}. Your copy still has the state from before it.">not merged: ${esc(c.u)}</span>` : ''}${c.d.length > 1 ? miniDiff(c.d.slice(1)) : ''}</div></div>`;
+}
+function recordBody(r) {
+  return el => {
+    const vis = visibleChanges(r, st, bulk);
+    const hidden = r.c.filter(c => !c.m).length - vis.length;
+    let h = `<div class="status mono">${esc(M.packs[r.k])}${r.a !== null ? ' · id ' + resId(r.a, r.b) : ''}</div>`;
+    h += vis.map(changeHtml).join('');
+    if (vis.some(c => M.facets[c.f] === 'script')) {
+      h += r.s ? det(`Script diff <span class="cnt">${r.s.length} lines</span>`, b => { b.innerHTML = scriptDiff(r.s); }, {open: r.s.length <= 60})
+        : '<p class="note">No difference in the rendered script: its encoding changed, or this type\'s script is not rendered yet.</p>';
+    }
+    if (hidden) h += `<p class="note">${hidden} more change${hidden > 1 ? 's' : ''} hidden by the filters (systemic or an unticked kind).</p>`;
+    setHtml(el, h);
+  };
+}
+function recordRow(r, vis) {
+  const counts = new Map();
+  for (const c of vis) counts.set(c.f, (counts.get(c.f) || 0) + 1);
+  const chips = [...counts].sort((a, b) => a[0] - b[0])
+    .map(([f, n]) => `<span class="chip f${f}">${n} ${M.facets[f]}</span>`).join('');
+  const side = st.group === 'type' ? base(M.packs[r.k]) : M.types[r.t];
+  const mv = r.mv !== undefined ? '<span class="badge">moved</span>' : '';
+  return det(`<span class="name">${esc(r.n)}</span>${mv}<span class="chips">${chips}</span><span class="sub" title="${esc(M.packs[r.k])}">${esc(side)}</span>`, recordBody(r));
+}
+const resRow = x => `<tr><td class="name">${esc(x[1])}</td><td>${esc(M.types[x[2]])}</td><td class="pk">${esc(M.packs[x[0]])}</td><td class="id mono">${resId(x[3], x[4])}</td></tr>`;
+const RES_HEAD = ['Name', 'Type', 'Pack', 'Id'];
+function byType(rows, open) {       // rows of [pack, name, type, a, b] grouped by type, largest first
+  const g = new Map();
+  for (const x of rows) (g.get(x[2]) || g.set(x[2], []).get(x[2])).push(x);
+  return [...g].sort((a, b) => b[1].length - a[1].length).map(([t, xs]) =>
+    det(`<span class="name">${esc(M.types[t])}</span><span class="cnt">${num(xs.length)}</span>`,
+      el => paged(el, xs, resRow, table(RES_HEAD)), {open})).join('');
+}
+
+// ---- sections --------------------------------------------------------------
+function renderTiles(s) {
+  const t = (n, label, href, c = '') => `<a class="tile ${c}" href="#${href}"><b>${num(n)}</b><span>${label}</span></a>`;
+  if (mine()) {
+    const n = g => modRows.filter(x => modGroupOf(x.status) === g).length;
+    const at = g => n(g) ? 'mod-' + g : 'mod';
+    $('#tiles').innerHTML = t(n('fix'), 'overrides to fix', at('fix'), n('fix') ? 'bad' : '')
+      + t(n('reapply'), 'to re-apply', at('reapply'), n('reapply') ? 'warn' : '')
+      + t(n('nothing'), 'nothing to do', at('nothing'), 'good')
+      + t(modRows.length, `overrides in ${esc(mod.name)}`, 'mod');
+    $('#unlisted').textContent = `Showing ${mod.name} only: the sections below list what touches its overrides. `
+      + 'Untick "Only this mod\'s resources" in the mod panel for the whole update.';
+    return;
+  }
+  $('#tiles').innerHTML =
+    t(M.recreated.length + M.removed.length + M.moved.length + M.inDeadPacks.length, w('tileBreaking', 'breaking for mods'), 'breaking', 'bad')
+    + t(M.added.length + M.inNewPacks.length, w('tileAdded', 'resources added'), 'newcontent', 'good')
+    + t(s.changed, w('tileChanged', 'resources changed'), 'changed')
+    + t([...M.schema.values()].reduce((n, m) => n + m.size, 0), w('tileSchema', 'fields added or dropped'), 'schema')
+    + t([...bulk].filter(Boolean).length, w('tileSystemic', 'systemic changes'), 'systemic')
+    + t(M.nDiffer, `of ${num(M.nCompared)} ${w('tilePacks', 'packs differ')}`, 'changed')
+    + (unmergedCount() ? t(unmergedCount(), 'game changes not merged', 'unmerged', 'warn') : '')
+    + (M.tips ? t(tipCounts().miss, 'tooltips with placeholders to check', 'tooltips', tipCounts().miss ? 'warn' : 'good')
+              + t(tipCounts().left, 'tooltips with leftover keys', 'tooltips') : '')
+    + (M.stale ? t(M.stale.length, 'overrides linking to removed resources', 'oldcontent', M.stale.length ? 'bad' : 'good')
+              + t((M.only || []).length, 'overrides with entries only your copy has', 'oldcontent') : '');
+  $('#unlisted').textContent = `Not counted as changed: ${num(s.bulkOnly)} resources touched only by systemic changes, `
+    + `${num(s.noiseOnly)} with only cosmetic or schema-migration differences`
+    + (s.opaque ? `. ${num(s.opaque)} of the changed resources are of types the decoder cannot read yet.` : '.')
+    + M.notes.map(n => ' ' + n.charAt(0).toUpperCase() + n.slice(1) + '.').join('');
+}
+
+function renderBreaking() {
+  const rec = M.recreated.filter(rowOk), rem = M.removed.filter(rowOk);
+  const mov = M.moved.filter(r => rootOk(r.k) && textOk(r.n, M.types[r.t], M.packs[r.k], M.packs[r.mv]));
+  const dead = M.deadPacks.filter(k => rootOk(k) && textOk(M.packs[k]));
+  const deps = M.deps.filter(x => rootOk(x[0]) && textOk(M.packs[x[0]], ...x[1], ...x[2]));
+  let h = `<h2>${w('breaking', 'Breaking for mods')} <small>${num(rec.length + rem.length + mov.length + dead.reduce((n, k) => n + M.inDeadPacks.filter(x => x[0] === k).length, 0))} resources</small></h2>
+    <p class="lead">${w('breakingLead', 'Resources the update removed, re-created under a new id, or moved to another pack. Anything that points at one of these by id, an override or a reference from another resource, no longer finds it, or finds it somewhere else.')}</p>`
+    + (mine() ? `<p class="lead">Not narrowed to ${esc(mod.name)}: its overrides of these are already under Fix above. A reference from one of its own resources to one of these breaks too, and this page cannot read those, so the whole list stays here for when something stops resolving.</p>` : '');
+  if (rec.length) h += det(`<span class="name">Re-created under a new id</span><span class="cnt">${num(rec.length)}</span><span class="sub">same name and type, different id</span>`,
+    el => paged(el, rec, x => `<tr><td class="name">${esc(x[1])}</td><td>${esc(M.types[x[2]])}</td><td class="pk">${esc(M.packs[x[0]])}</td><td class="id mono">${resId(x[3], x[4])} → ${resId(x[5], x[6])}</td></tr>`,
+      table(['Name', 'Type', 'Pack', 'Old id → new id'])));
+  if (rem.length) h += det(`<span class="name">${w('removed', 'Removed')}</span><span class="cnt">${num(rem.length)}</span>`,
+    el => { el.innerHTML = byType(rem, rem.length <= PAGE); el.querySelectorAll('details[open][data-lz]').forEach(fillLazy); });
+  if (mov.length) h += det(`<span class="name">Moved to another pack</span><span class="cnt">${num(mov.length)}</span><span class="sub">same id; the pack dependency changes</span>`,
+    el => paged(el, mov, r => `<tr><td class="name">${esc(r.n)}</td><td>${esc(M.types[r.t])}</td><td class="pk">${esc(M.packs[r.mv])} → ${esc(M.packs[r.k])}</td><td class="id mono">${resId(r.a, r.b)}</td></tr>`,
+      table(['Name', 'Type', 'From → to', 'Id'])));
+  for (const k of dead) {
+    const xs = M.inDeadPacks.filter(x => x[0] === k);
+    h += det(`<span class="name">Pack removed: ${esc(M.packs[k])}</span><span class="cnt">${num(xs.length)}</span>`,
+      el => paged(el, xs, resRow, table(RES_HEAD)));
+  }
+  if (deps.length) h += det(`<span class="name">Pack dependencies changed</span><span class="cnt">${num(deps.length)}</span>`,
+    el => paged(el, deps, x => `<tr><td class="pk">${esc(M.packs[x[0]])}</td><td>${x[1].map(d => `<span class="add">+ ${esc(d)}</span>`).concat(x[2].map(d => `<span class="rem">- ${esc(d)}</span>`)).join('<br>')}</td></tr>`,
+      table(['Pack', 'Dependency'])));
+  if (M.acps.length && !st.q) h += `<p class="note">Package manifests that differ: ${M.acps.map(esc).join(', ')}</p>`;
+  if (!(rec.length + rem.length + mov.length + dead.length + deps.length)) h += '<p class="empty">Nothing here matches the filters.</p>';
+  setSection('breaking', h);
+}
+
+function renderNew() {
+  const add = M.added.filter(rowOk);
+  const packs = M.newPacks.filter(k => rootOk(k));
+  let h = '', total = add.length;
+  for (const k of packs) {
+    const xs = M.inNewPacks.filter(x => x[0] === k && (textOk(M.packs[k]) || rowOk(x)));
+    if (!xs.length) continue;
+    total += xs.length;
+    const kinds = new Map();
+    for (const x of xs) kinds.set(x[2], (kinds.get(x[2]) || 0) + 1);
+    const top = [...kinds].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t, n]) => `${n} ${M.types[t]}`).join(', ');
+    h += det(`<span class="name">New pack: ${esc(M.packs[k])}</span><span class="cnt">${num(xs.length)}</span><span class="sub">${esc(top)}${kinds.size > 3 ? ', …' : ''}</span>`,
+      el => paged(el, xs, resRow, table(RES_HEAD)));
+  }
+  if (add.length) h += det(`<span class="name">${w('added', 'Added to existing packs')}</span><span class="cnt">${num(add.length)}</span><span class="sub">by type</span>`,
+    el => setHtml(el, byType(add, false)), {open: add.length <= PAGE});
+  setSection('newcontent', `<h2>${w('new', 'New content')} <small>${num(total)} resources</small></h2>`
+    + (mine() ? '<p class="lead">Not narrowed to the mod: new content cannot affect an existing override.</p>' : '')
+    + (h || '<p class="empty">Nothing here matches the filters.</p>'));
+}
+
+function registryHtml(typeOk) {       // what the exe's class registry gained and lost
+  const R = M.registry;
+  if (!R) return M.words && M.words.noRegistry !== undefined ? M.words.noRegistry : '<p class="note">The exe\'s registries were not compared: the old side has none stored (the snapshot holds no schema_db.json).</p>';
+  const cls = ([name, label]) => `<td class="name">${esc(label || '')}</td><td class="mono">${esc(name)}</td>`;
+  const kinds = [
+    ['+', 'Fields added', 'add', f => `<td class="mono add">${esc(f[5])}</td>`, 'Field'],
+    ['-', 'Fields removed', 'rem', f => `<td class="mono rem">${esc(f[4])}</td>`, 'Field'],
+    ['~', 'Field ids renamed or reused', '', f => `<td class="mono"><span class="old">${esc(f[4])}</span> <span class="arrow">→</span> <span class="new">${esc(f[5])}</span></td>`, 'Old name → new name'],
+  ];
+  let h = '';
+  for (const [kind, title, c, cell, head] of kinds) {
+    const rows = R.fields.filter(f => f[3] === kind && typeOk(f[1]) && textOk(f[0], f[1] || '', f[4] || '', f[5] || ''));
+    rows.sort((a, b) => !a[1] - !b[1] || (a[1] || a[0]).localeCompare(b[1] || b[0]) || a[2] - b[2]);
+    if (rows.length) h += det(`<span class="name ${c}">${title}</span><span class="cnt">${num(rows.length)}</span><span class="sub">${num(rows.filter(f => f[1]).length)} on resource types</span>`,
+      el => paged(el, rows, f => `<tr>${cls(f)}<td class="id mono">${f[2]}</td>${cell(f)}</tr>`, table(['Resource type', 'Class', 'Id', head])));
+  }
+  for (const [key, title, c] of [['classes_new', 'Classes added', 'add'], ['classes_gone', 'Classes removed', 'rem']]) {
+    const rows = R[key].filter(x => typeOk(x[1]) && textOk(x[0], x[1] || ''));
+    if (rows.length) h += det(`<span class="name ${c}">${title}</span><span class="cnt">${num(rows.length)}</span>`,
+      el => paged(el, rows, x => `<tr>${cls(x)}</tr>`, table(['Resource type', 'Class'])));
+  }
+  return `<h3>In the editor's exe</h3><p class="lead">The class registry of the two builds compared: every field the exe declares, whether or not shipped content uses it. Names are registry names, not editor labels, and both registries are scanned out of the exe — a rename can also be the scanner reading one field differently.</p>`
+    + (h || '<p class="empty">Nothing here matches the filters.</p>')
+    + '<h3>In re-saved resources</h3>';
+}
+
+function renderSchema() {
+  let nFields = 0, h = '';
+  const types = [], my = mine();
+  const myTypes = new Set([...modRecs].map(i => M.types[M.records[i].t]));
+  for (const [t, byField] of M.schema) {
+    const fields = [];
+    for (const [mi, recs] of byField) {
+      const [path, sign, full] = M.migs[mi];
+      if (!textOk(M.types[t], path, full)) continue;
+      const shown = recs.filter(i => rootOk(M.records[i].k) && (!my || modRecs.has(i)));
+      if (shown.length) fields.push([path, sign, shown, full]);
+    }
+    if (!fields.length) continue;
+    fields.sort((a, b) => a[1].localeCompare(b[1]) || a[0].localeCompare(b[0]));
+    nFields += fields.length;
+    types.push([t, fields]);
+  }
+  types.sort((a, b) => b[1].length - a[1].length || M.types[a[0]].localeCompare(M.types[b[0]]));
+  for (const [t, fields] of types) {
+    const plus = fields.filter(f => f[1] === '+').length, minus = fields.length - plus;
+    const sub = (plus ? `<span class="add">+${plus}</span>` : '') + (plus && minus ? ' ' : '') + (minus ? `<span class="rem">−${minus}</span>` : '');
+    h += det(`<span class="name">${esc(M.types[t])}</span><span class="cnt">${fields.length} field${fields.length > 1 ? 's' : ''}</span><span class="sub">${sub}</span>`,
+      el => setHtml(el, fields.map(([path, sign, recs, full]) =>
+        det(`<span class="${sign === '+' ? 'add' : 'rem'}">${sign === '+' ? '+' : '−'} <span class="path" title="${esc(full)}">${pathHtml(path)}</span></span><span class="cnt">${num(recs.length)} resource${recs.length > 1 ? 's' : ''}</span>`,
+          b => paged(b, recs, i => { const r = M.records[i]; return `<tr><td class="name">${esc(r.n)}</td><td class="pk">${esc(M.packs[r.k])}</td><td class="id mono">${resId(r.a, r.b)}</td></tr>`; },
+            table(['Resource', 'Pack', 'Id'])))).join('')));
+  }
+  setSection('schema', `<h2>${w('schema', 'Schema changes')} <small>${num(nFields)} fields in ${num(types.length)} types${w('schemaSmall', ' re-saved')}${my ? ` in ${esc(mod.name)}'s overrides` : M.registry ? `, ${num(M.registry.fields.length)} registry fields` : ''}</small></h2>`
+    + registryHtml(label => !my || myTypes.has(label)) + `
+    <p class="lead">${w('schemaLead', `A field that appeared (+) or vanished (−) with an empty value in resources the game re-saved: the type's layout changed, nobody edited the resource. An override made before the update is a copy that still has the old layout. A new field that arrives with a value is listed under Systemic changes instead.`)}</p>`
+    + (h || '<p class="empty">Nothing here matches the filters.</p>'));
+}
+
+function renderSystemic() {
+  const sigs = [], my = mine();
+  const recsOf = g => my ? M.sigRecs[g].filter(i => modRecs.has(i)) : M.sigRecs[g];
+  bulk.forEach((on, g) => { if (on && textOk(...M.sigs[g]) && recsOf(g).length) sigs.push(g); });
+  sigs.sort((a, b) => recsOf(b).length - recsOf(a).length);
+  const row = g => {
+    const [path, what, full] = M.sigs[g], recs = recsOf(g);
+    const [first, ...rest] = what.split('\n');
+    const types = new Map();
+    for (const i of recs) types.set(M.records[i].t, (types.get(M.records[i].t) || 0) + 1);
+    const top = [...types].sort((a, b) => b[1] - a[1]);
+    const tsum = top.slice(0, 2).map(([t, n]) => `${M.types[t]} ×${n}`).join(', ') + (top.length > 2 ? `, +${top.length - 2} more types` : '');
+    const places = my ? ` · of ${num(M.sigRecs[g].length)} in the update`
+      : M.sigHits[g] === recs.length ? '' : ` · ${num(M.sigHits[g])} places`;
+    const c = {d: [first], p: path};
+    return det(`<span class="cnt">${num(recs.length)}×</span><span><span class="path" data-pv="${g}" title="${esc(full)} — click for every resource where this field changed">${pathHtml(path)}</span>: <span class="what mono">${whatHtml(c)}</span></span><span class="sub">${esc(tsum)}${places}</span>`,
+      el => {
+        if (rest.length) el.insertAdjacentHTML('beforeend', miniDiff(rest));
+        paged(el, recs, i => { const r = M.records[i]; return `<tr><td class="name">${esc(r.n)}</td><td>${esc(M.types[r.t])}</td><td class="pk">${esc(M.packs[r.k])}</td></tr>`; },
+          table(['Resource', 'Type', 'Pack']));
+      });
+  };
+  const und = sigs.filter(g => M.sigs[g][1] === 'changed (undecoded)');
+  const dec = sigs.filter(g => M.sigs[g][1] !== 'changed (undecoded)');
+  let h = `<h2>${w('systemic', 'Systemic changes')} <small>${num(sigs.length)} patterns</small></h2>
+    <p class="lead">The same change repeated in ${st.minBulk} or more resources. ${my ? `Only the ones that hit ${esc(mod.name)}'s overrides, counted in those: each such resource is also under Re-apply above, with this change marked systemic.` : w('systemicLead', 'Usually a schema change the game applied on re-save, sometimes a deliberate pass over many resources — the readable ones are worth a look.')}</p>`;
+  h += dec.map(row).join('');
+  if (und.length) h += det(`<span class="name">Undecoded payloads re-saved</span><span class="cnt">${num(und.length)} fields</span><span class="sub">a field the decoder cannot read changed in many resources</span>`,
+    el => setHtml(el, und.map(row).join('')));
+  if (!sigs.length) h += `<p class="empty">${st.minBulk > 0 ? 'Nothing here matches the filters.' : 'Grouping is off.'}</p>`;
+  setSection('systemic', h);
+}
+
+function renderChanged(s) {
+  const groups = new Map();
+  let shown = 0, hidden = 0;
+  M.records.forEach((r, i) => {
+    if (cls[i] !== 2 && !(cls[i] === 1 && !st.hideBulk)) return;
+    if (st.modOnly && !modRecs.has(i)) return;
+    const vis = (rootOk(r.k) && (!st.q || haystack(M, r).includes(st.q))) ? visibleChanges(r, st, bulk) : [];
+    if (!vis.length) { hidden++; return; }
+    shown++;
+    const key = st.group === 'type' ? r.t : r.k;
+    (groups.get(key) || groups.set(key, []).get(key)).push([r, vis]);
+  });
+  const label = k => st.group === 'type' ? M.types[k] : M.packs[k];
+  const sorted = [...groups].sort((a, b) => b[1].length - a[1].length || label(a[0]).localeCompare(label(b[0])));
+  const open = shown <= 40;
+  let h = `<h2>${w('changed', 'Changed resources')} <small>${num(shown)} shown</small></h2>
+    <div class="status"><span>${num(sorted.length)} ${st.group === 'type' ? 'types' : 'packs'}${hidden ? ` · ${num(hidden)} resources hidden by the filters` : ''}</span>${hidden ? '<button id="reset" type="button">Reset filters</button>' : ''}</div>`;
+  h += sorted.map(([k, rows]) => det(`<span class="name">${esc(label(k))}</span><span class="cnt">${num(rows.length)}</span>`,
+    el => paged(el, rows, ([r, vis]) => recordRow(r, vis)), {open})).join('');
+  if (!shown) h += '<p class="empty">Nothing matches the filters.</p>';
+  setSection('changed', h);
+  const reset = $('#reset');
+  if (reset) reset.onclick = resetFilters;
+}
+
+function facetCounts() {          // what ticking a kind would add to the detail right now
+  const fc = new Uint32Array(M.facets.length), my = mine();
+  for (const r of M.records) {
+    if (!rootOk(r.k) || (st.q && !haystack(M, r).includes(st.q)) || (my && !modRecs.has(r.i))) continue;
+    for (const c of r.c) if (!c.m && !(st.hideBulk && c.g !== undefined && bulk[c.g])) fc[c.f]++;
+  }
+  document.querySelectorAll('#facets .n').forEach((el, i) => { el.textContent = num(fc[i]); });
+}
+
+
+
+// ---- game changes from earlier updates that the copies still undo ------------
+const buildNum = label => { const m = /(\d+)\D*$/.exec(label); return m ? +m[1] : 0; };
+function unmergedGroups() {
+  const groups = new Map();
+  M.records.forEach(r => {
+    for (const c of r.c) {
+      if (!c.u) continue;
+      const g = groups.get(c.u) || groups.set(c.u, new Map()).get(c.u);
+      (g.get(r) || g.set(r, []).get(r)).push(c);
+    }
+  });
+  return [...groups].sort((a, b) => buildNum(b[0]) - buildNum(a[0]));
+}
+function unmergedCount() { return M.records.reduce((n, r) => n + r.c.filter(c => c.u).length, 0); }
+function renderUnmerged() {
+  const el = $('#unmerged'), groups = unmergedGroups();
+  $('#navUnmerged').hidden = !groups.length;
+  if (!groups.length) { el.hidden = true; return; }
+  el.hidden = false;
+  const nRes = new Set(groups.flatMap(([, g]) => [...g.keys()])).size;
+  let h = `<h2>Not merged from game updates <small>${num(unmergedCount())} changes in ${num(nRes)} overrides</small></h2>
+    <p class="lead">Changes the game made in an update that your copy of the resource does not have: the copy still holds the value from before that update, so it undoes the change in game. Carry the change into your override, or re-make the override, unless keeping the old value is on purpose. Each line reads game → your copy. Newest update first.</p>`;
+  for (const [label, g] of groups) {
+    const rows = [...g];
+    const n = rows.reduce((k, [, cs]) => k + cs.length, 0);
+    h += `<h3>Update ${esc(label)} <small>${num(n)} change${n > 1 ? 's' : ''} in ${num(rows.length)} override${rows.length > 1 ? 's' : ''}</small></h3>`;
+    h += rows.map(([r, cs]) => det(`<span class="name">${esc(r.n)}</span><span class="cnt">${cs.length}</span><span class="sub" title="${esc(M.packs[r.k])}">${esc(M.types[r.t])}</span>`,
+      el => setHtml(el, `<div class="status mono">${esc(M.packs[r.k])} · id ${resId(r.a, r.b)}</div>` + cs.map(c => changeHtml(c)).join('')),
+      {open: rows.length <= 30})).join('');
+  }
+  setSection('unmerged', h);
+}
+
+// ---- tooltip keys: placeholders nothing fills, keys the text no longer uses -----
+const tipOk = e => !st.q || (e.n + ' ' + e.p + ' ' + M.packs[e.k] + ' ' + (e.phs || e.keys || []).map(x => x.ph || x.key).join(' ') + (e.l ? ' ' + e.l.name : '') + (e.x ? ' ' + e.x.w : '')).toLowerCase().includes(st.q);
+function tipCounts() {
+  const T = M.tips || {missing: [], leftover: []};
+  return {miss: T.missing.filter(e => e.phs.some(x => !x.g)).length, left: T.leftover.filter(e => e.keys.some(x => !x.g)).length};
+}
+const WHY = {
+  nostore: ['no data store by this name', 'Nothing in the game or the mod has this DataStoreTag, so there is nothing to read the value from. Usually a typo, or a tag that was renamed.'],
+  nokey: ['no value typed in', 'Not a data store name, and the key list has no value for it. Fine when the game fills it itself (event and ambition texts: {EventHero}, {RenownReward}); otherwise it needs a typed-in key, like {amount}.'],
+};
+function tipRows(list, item, n) {
+  const byRes = new Map();
+  for (const e of list) {
+    const k = e.n + '\u0000' + e.a + ':' + e.b;
+    (byRes.get(k) || byRes.set(k, []).get(k)).push(e);
+  }
+  const rows = [...byRes.values()].sort((a, b) => a[0].n.localeCompare(b[0].n));
+  return rows.map(es => {
+    const e0 = es[0], cnt = es.reduce((k, e) => k + n(e), 0);
+    return det(`<span class="name">${esc(e0.n)}</span><span class="cnt">${cnt}</span><span class="sub" title="${esc(M.packs[e0.k])}">${esc(M.types[e0.t])}</span>`,
+      el => setHtml(el, `<div class="status mono">${esc(M.packs[e0.k])}${e0.a != null ? ' · id ' + resId(e0.a, e0.b) : ''}</div>`
+        + es.map(e => `<div class="chg"><span class="dot f0"></span><div><span class="path">${esc(e.p)}</span>: ${item(e)}</div></div>`).join('')),
+      {open: rows.length <= 12});
+  }).join('');
+}
+function renderTips() {
+  const el = $('#tooltips'), T = M.tips;
+  $('#navTips').hidden = !T;
+  if (!T) { el.hidden = true; return; }
+  el.hidden = false;
+  const mine = (list, f) => list.map(e => ({...e, [f]: e[f].filter(x => !x.g)})).filter(e => e[f].length && tipOk(e));
+  const game = (list, f) => list.map(e => ({...e, [f]: e[f].filter(x => x.g)})).filter(e => e[f].length && tipOk(e));
+  const phHtml = x => `<span class="mono">${esc(x.ph)}</span> <span class="badge" title="${esc(WHY[x.why][1])}">${WHY[x.why][0]}</span>`;
+  const keyHtml = x => `<span class="mono rem">${esc(x.key)}${x.v ? ' = ' + esc(x.v) : ''}</span>`;
+  const mM = mine(T.missing, 'phs'), mG = game(T.missing, 'phs'), lM = mine(T.leftover, 'keys'), lG = game(T.leftover, 'keys');
+  const nPh = e => e.phs.length, nK = e => e.keys.length;
+  let h = `<h2>Tooltip keys <small>${num(mM.length)} placeholders to check · ${num(lM.length)} leftover</small></h2>
+    <p class="lead">Every tooltip in your overrides, read against its text in your .po (or the game's, for texts you did not replace). A {placeholder} is filled from a value typed into the key list, or else from a data store (the DataStoreTag of the resource or of one it links to). {GLOBAL.…} and {LOC.…} always resolve and are not checked. Search filters these lists too.</p>
+    <h3>Placeholders nothing fills <small>${num(mM.reduce((k, e) => k + nPh(e), 0))} in ${num(mM.length)} tooltips</small></h3>
+    <p class="lead">A placeholder in the text that has no typed-in value and no data store to read from. In game it would most likely show as the raw {…} text or as nothing. A data store that exists counts as fine: this page cannot follow every link the game resolves at run time, so it only checks that a store by that name exists somewhere in the game or the mod. Hover a label for what it means.</p>`;
+  h += mM.length ? tipRows(mM, e => e.phs.map(phHtml).join(', '), nPh) : '<p class="empty">None.</p>';
+  if (mG.length) h += det(`<span class="name">The same in the game's own version</span><span class="cnt">${num(mG.length)}</span><span class="sub">not something your mod did; mostly names the game fills at run time</span>`,
+    el => setHtml(el, tipRows(mG, e => e.phs.map(phHtml).join(', '), nPh)));
+  h += `<h3>Leftover keys <small>${num(lM.reduce((k, e) => k + nK(e), 0))} in ${num(lM.length)} tooltips</small></h3>
+    <p class="lead">Keys stored in the key list that the text never uses, usually left from the text the tooltip had before. They do nothing in game, and the editor's Localized String Dialog does not show them. Opening the dialog and clicking Ok, then saving, rebuilds the list from the text and drops them. Worth a look when a leftover sits next to a placeholder above: it can be the key the text meant to use.</p>`;
+  h += lM.length ? tipRows(lM, e => e.keys.map(keyHtml).join(', '), nK) : '<p class="empty">None.</p>';
+  if (lG.length) h += det(`<span class="name">The same in the game's own version</span><span class="cnt">${num(lG.length)}</span><span class="sub">the game ships these leftovers itself</span>`,
+    el => setHtml(el, tipRows(lG, e => e.keys.map(keyHtml).join(', '), nK)));
+  setSection('tooltips', h);
+}
+
+// ---- signs of an old copy: dead links, and entries the game's version does not have ----
+const ONLY_KIND = {entry: 'entry', action: 'script action', inside: 'added inside an action'};
+function renderOld() {
+  const el = $('#oldcontent');
+  $('#navOld').hidden = !M.stale;
+  if (!M.stale) { el.hidden = true; return; }
+  el.hidden = false;
+  const dead = M.stale.flatMap(e => e.links.map(l => ({...e, p: l.p, l}))).filter(tipOk);
+  const only = (M.only || []).flatMap(o => { const r = M.records[o.i];
+    return o.items.map(x => ({n: r.n, k: r.k, t: r.t, a: r.a, b: r.b, p: x.p, x})); }).filter(tipOk);
+  const one = () => 1;
+  let h = `<h2>Possibly old content <small>${num(new Set(dead.map(e => e.n + e.a + ':' + e.b)).size)} with dead links · ${num(new Set(only.map(e => e.n + e.a + ':' + e.b)).size)} with entries only your copy has</small></h2>
+    <p class="lead">An override is a copy of the game's resource from the day you made it. If the game changed that resource later, the copy can still hold things the game has since removed. These two lists are the signs of that which can be read from today's game alone. Nothing here says when a copy was made.</p>
+    <h3>Links to resources that no longer exist <small>${num(dead.length)}</small></h3>
+    <p class="lead">Your copy points at a resource id that neither the game nor your mod has. That is almost always something the game removed after the copy was made. Links the game's own version has dead too are left out.</p>`;
+  h += dead.length ? tipRows(dead, e => `<span class="mono rem">${esc(e.l.name)}</span> <span class="badge">id ${esc(e.l.id)}</span>`, one) : '<p class="empty">None: every link in your overrides points at something that exists.</p>';
+  h += `<h3>Entries only your copy has <small>${num(only.length)}</small></h3>
+    <p class="lead">Whole entries in your copy that the game's current version does not have: list entries, script actions, and things added inside an action (a prediction, for example). Some are your own additions; any you do not remember adding are most likely old game content the game has since removed. Re-making the override (unmod, mod, re-apply your edits) clears those. Tooltip keys are left out: they are under Tooltip keys.</p>`;
+  h += only.length ? tipRows(only, e => `<span class="badge">${ONLY_KIND[e.x.k]}</span> <span class="mono add">${esc(e.x.w)}</span>${e.x.was ? `<div class="mono old" style="margin-top:2px">game: ${esc(e.x.was)}</div>` : ''}`, one) : '<p class="empty">None.</p>';
+  setSection('oldcontent', h);
+}
+
+// ---- the mod check ----------------------------------------------------------
+let mod = null, modRows = [], modRecs = new Set();
+const mine = () => st.modOnly && mod !== null;    // the sections follow the mod
+const MOD_GROUP_TEXT = {
+  fix: ['Fix', 'rem', 'These overrides no longer reach the resource they were made on.'],
+  reapply: ['Re-apply', 'warn', 'The game changed these resources after your copy was made, and your copy still has the old values. Each lists everything the game changed, systemic changes included.'],
+  nothing: ['Nothing to do', 'add', ''],
+  unchecked: ['Not checked', '', ''],
+};
+const MOD_TEXT = {
+  gone: ['Target removed', 'rem', 'The shipped resource is gone, so the override applies to nothing. Remove it, or move what it did somewhere else.'],
+  recreated: ['Target re-created under a new id', 'rem', 'The game deleted the resource and made it again under another id. The override still points at the old one: make it again on the new one.'],
+  moved: ['Target moved to another pack', 'rem', 'Same id, different pack: the override names the pack it used to be in. Make it again from the pack it is in now.'],
+  changed: ['Changed under you', 'warn', 'Your copy undoes these changes until you carry them into it (or re-make the override on the new version and re-apply your edits).'],
+  restamped: ['Only script node ids re-stamped', '', 'The script is identical; the game stamped new ids on its nodes. Those ids are bookkeeping the game does not read (re-minting them was tested in game), so your copy\'s old ones work as well.'],
+  predates: ['Only empty fields added or dropped', '', 'The game re-saved this type with fields added or dropped, all of them empty. Your copy is in the old layout and reads those fields as empty too, so there is nothing to re-apply. If you had edited a field the game dropped, that edit no longer does anything.'],
+  fresh: ['Target is new in this build', '', 'The resource first appears in the new build, so this override was made on it and cannot predate the update.'],
+  same: ['No difference found', '', 'Nothing the game reads differs for this id between the two builds. A target that was already missing before the update also lands here: the report only knows what changed.'],
+  nopack: ['Pack not in this report', '', 'The pack this override targets was not among those compared.'],
+  unreadable: ['Unreadable entry', '', 'No target id could be read from this entry.'],
+};
+function loadMod(file) {
+  file.arrayBuffer().then(buf => {
+    mod = modOverrides(new Uint8Array(buf));
+    mod.file = file.name;
+    st.modOnly = true;
+    Object.assign(st.open, {mod: true, breaking: false, newcontent: false});
+    render();
+    $('#mod').scrollIntoView();
+  }).catch(e => { mod = null; setHtml($('#mod'), `<p class="note rem">Could not read ${esc(file.name)}: ${esc(e.message)}</p>`); });
+}
+function modChanges(r) {          // everything the game did to this resource, filters ignored
+  return el => {
+    const real = r.c.filter(c => !c.m), migs = r.c.filter(c => c.m);
+    let h = `<div class="status mono">${esc(M.packs[r.k])} · id ${resId(r.a, r.b)}</div>` + real.map(c => changeHtml(c, isBulk(c))).join('');
+    if (real.some(c => M.facets[c.f] === 'script') && r.s) h += det(`Script diff <span class="cnt">${r.s.length} lines</span>`, b => { b.innerHTML = scriptDiff(r.s); });
+    if (migs.length) h += `<p class="note">Layout: ${migs.map(c => `<span class="${c.d[0].startsWith('+') ? 'add' : 'rem'}">${c.d[0].startsWith('+') ? '+' : '−'} ${esc(c.p)}</span>`).join(', ')}</p>`;
+    setHtml(el, h);
+  };
+}
+function renderMod() {
+  const el = $('#mod');
+  if (!mod) { el.hidden = true; modRecs = new Set(); return; }
+  el.hidden = false;
+  modRows = checkMod(M, mod, bulk);
+  modRecs = new Set(modRows.filter(x => x.rec !== undefined).map(x => x.rec));
+  let h = `<h2>${esc(mod.name)} <small>${num(modRows.length)} overrides · ${esc(mod.file)}</small></h2>
+    <p class="lead">Each override matched by pack and resource id against this report, on the assumption that it was made on ${esc(M.old)}. The page cannot tell your edits from the game's: it says what the game changed under each override, not whether your copy merges cleanly. The file is read here in the page; nothing leaves your machine.</p>
+    <div class="status"><label><input type="checkbox" id="modOnly"${st.modOnly ? ' checked' : ''}> Only this mod's resources in the sections below</label><button id="modClear" type="button">Remove mod</button></div>`;
+  const del = x => x.ov.deleted ? ' <span class="badge">mod deletes it</span>' : '';
+  const typeOf = x => M.types[M.records[x.rec].t];
+  for (const [group, statuses] of MOD_GROUPS) {
+    const inGroup = modRows.filter(x => statuses.includes(x.status) && textOk(x.ov.name, x.ov.pack, x.ov.id || ''));
+    if (!inGroup.length) continue;
+    const [gtitle, gc, glead] = MOD_GROUP_TEXT[group];
+    h += `<h3 id="mod-${group}" class="${gc}">${gtitle} <small>${num(inGroup.length)}</small></h3>` + (glead ? `<p class="lead">${glead}</p>` : '');
+    for (const status of statuses) {
+      const rows = inGroup.filter(x => x.status === status);
+      if (!rows.length) continue;
+      const [title, c, why] = MOD_TEXT[status];
+      h += det(`<span class="name ${c}">${title}</span><span class="cnt">${num(rows.length)}</span><span class="sub">${esc(why)}</span>`, body => {
+        if (status === 'changed' || status === 'predates') {
+          rows.sort((a, b) => typeOf(a).localeCompare(typeOf(b)) || M.records[a.rec].n.localeCompare(M.records[b.rec].n));
+          paged(body, rows, x => {
+            const r = M.records[x.rec], real = r.c.filter(c => !c.m), sys = real.filter(isBulk).length;
+            const sub = status === 'changed' ? ` · ${real.length} change${real.length > 1 ? 's' : ''}${sys ? `, ${sys} systemic` : ''}` : '';
+            return det(`<span class="name">${esc(r.n)}</span>${del(x)}<span class="sub">${esc(M.types[r.t])}${sub}</span>`, modChanges(r));
+          });
+        } else {
+          paged(body, rows, x => `<tr><td class="name">${esc(x.row ? x.row[1] : x.rec !== undefined ? M.records[x.rec].n : x.ov.name)}${del(x)}</td><td class="pk">${esc(status === 'moved' ? M.packs[M.records[x.rec].k] : x.ov.pack)}</td><td class="id mono">${esc(x.ov.id || '')}${status === 'recreated' ? ' → ' + resId(x.row[5], x.row[6]) : ''}</td></tr>`,
+            table(['Resource', status === 'moved' ? 'Now in' : 'Pack', 'Id']));
+        }
+      }, {open: group === 'fix' || group === 'reapply'});
+    }
+  }
+  setSection('mod', h);
+  $('#modOnly').onchange = e => { st.modOnly = e.target.checked; render(); };
+  $('#modClear').onclick = () => {
+    mod = null; st.modOnly = false; $('#acp').value = '';
+    Object.assign(st.open, {breaking: true, newcontent: true});
+    render();
+  };
+}
+
+// ---- the pivot panel --------------------------------------------------------
+let pv = null;                    // {g, rows, col, dir}
+const PV_COLS = [['name', 'Resource'], ['where', 'Where'], ['type', 'Type'], ['pack', 'Pack'], ['o', 'Old'], ['n', 'New'], ['delta', 'Δ']];
+function openPivot(g) {
+  pv = {g, rows: pivotRows(M, M.sigs[g][2]), col: 'name', dir: 1};
+  st.open.pivot = true;
+  renderPivot();
+  $('#pivot').scrollIntoView();
+}
+function renderPivot() {
+  const el = $('#pivot');
+  el.hidden = !pv;
+  if (!pv) return;
+  const val = (x, col) => col === 'name' ? M.records[x.i].n : col === 'type' ? M.types[M.records[x.i].t]
+    : col === 'pack' ? base(M.packs[M.records[x.i].k]) : col === 'where' ? x.c.p : x[col];
+  const rows = pv.rows.slice().sort((a, b) => {
+    const p = val(a, pv.col), q = val(b, pv.col);
+    if (p === null || q === null) return (p === null) - (q === null);     // blanks last either way
+    const np = typeof p === 'number' ? p : /^-?\d+(\.\d+)?$/.test(p) ? parseFloat(p) : NaN;
+    const nq = typeof q === 'number' ? q : /^-?\d+(\.\d+)?$/.test(q) ? parseFloat(q) : NaN;
+    return pv.dir * (!isNaN(np) && !isNaN(nq) ? np - nq : String(p).localeCompare(String(q)));
+  });
+  const anyDelta = rows.some(x => x.delta !== null);
+  const [shown, , full] = M.sigs[pv.g];
+  // the same field several times in one resource (list entries): say which
+  const anyWhere = rows.some(x => x.c.p !== shown);
+  const cols = PV_COLS.filter(([k]) => (k !== 'delta' || anyDelta) && (k !== 'where' || anyWhere));
+  const nRes = new Set(rows.map(x => x.i)).size, my = mine();
+  const nMine = my ? new Set(rows.filter(x => modRecs.has(x.i)).map(x => x.i)).size : 0;
+  setSection('pivot', `<h2>Field: ${esc(shown)} <small>${num(rows.length)} changes in ${num(nRes)} resources${my ? `, ${num(nMine)} of them ${esc(mod.name)}'s` : ''}</small></h2>
+    <div class="status"><span class="mono">${esc(full)}</span><span>every resource where this field changed, whatever the filters say</span><button id="pvClose" type="button">Close</button></div>`);
+  $('#pivot > div').insertAdjacentHTML('beforeend', '<div id="pvTable"></div>');
+  const body = $('#pvTable');
+  paged(body, rows, x => {
+    const r = M.records[x.i];
+    const d = x.delta === null ? '' : (x.delta > 0 ? '+' : '') + (Math.round(x.delta * 1e4) / 1e4);
+    return `<tr><td class="name">${esc(r.n)}${my && modRecs.has(x.i) ? ' <span class="badge">yours</span>' : ''}</td>${anyWhere ? `<td class="pk">${esc(x.c.p)}</td>` : ''}<td>${esc(M.types[r.t])}</td><td class="pk" title="${esc(M.packs[r.k])}">${esc(base(M.packs[r.k]))}</td>`
+      + `<td class="mono old">${esc(x.o)}</td><td class="mono new">${esc(x.n)}</td>${anyDelta ? `<td class="mono ${x.delta > 0 ? 'add' : x.delta < 0 ? 'rem' : ''}">${d}</td>` : ''}</tr>`;
+  }, table(cols.map(([k, t]) => `<span class="sort" data-col="${k}">${t}${pv.col === k ? (pv.dir > 0 ? ' ▴' : ' ▾') : ''}</span>`)));
+  body.querySelector('thead').onclick = e => {
+    const col = e.target.dataset && e.target.dataset.col;
+    if (!col) return;
+    pv.dir = pv.col === col ? -pv.dir : 1;
+    pv.col = col;
+    renderPivot();
+  };
+  $('#pvClose').onclick = e => { e.stopPropagation(); pv = null; renderPivot(); };
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest && e.target.closest('[data-pv]');
+  if (!t) return;
+  e.preventDefault();             // inside a <summary>: do not toggle it
+  openPivot(+t.dataset.pv);
+});
+
+function render() {
+  lazy.clear();
+  bulk = bulkFlags(M, st.minBulk);
+  const s = classify(M, bulk);
+  cls = s.cls;
+  renderMod();                    // first: the tiles and filters read modRows / modRecs
+  renderUnmerged();
+  renderTips();
+  renderOld();
+  renderTiles(s);
+  facetCounts();
+  renderPivot();
+  renderBreaking();
+  renderNew();
+  renderSchema();
+  renderSystemic();
+  renderChanged(s);
+}
+
+// ---- controls --------------------------------------------------------------
+function buildControls() {
+  $('#builds').textContent = `${M.old}  →  ${M.new}`;
+  document.title = `${w('title', 'AoW4 pack diff')}: ${M.old} → ${M.new}`;
+  $('header h1').firstChild.textContent = w('title', 'AoW4 pack diff') + ' ';
+  if (w('noModCheck', false)) $('label.btn').hidden = true;
+  $('#navSchema').textContent = w('schemaNav', 'Schema');
+  $('#minBulk').value = st.minBulk;
+  $('#facets').innerHTML = M.facets.map((f, i) =>
+    `<label><input type="checkbox" data-f="${i}"${st.facets.has(i) ? ' checked' : ''}><span class="chip f${i}">${f}</span><span class="n"></span></label>`).join('');
+  $('#nav').onclick = e => {      // a jump opens the section it lands on
+    const id = (e.target.getAttribute('href') || '').slice(1);
+    if (id in st.open && !st.open[id]) $('#' + id + ' > h2').click();
+  };
+  $('#facets').onchange = e => {
+    const i = +e.target.dataset.f;
+    e.target.checked ? st.facets.add(i) : st.facets.delete(i);
+    render();
+  };
+  const rc = new Map();
+  for (const r of M.records) rc.set(M.packRoot[r.k], (rc.get(M.packRoot[r.k]) || 0) + 1);
+  for (const x of M.came.concat(M.went)) if (!rc.has(M.packRoot[x[0]])) rc.set(M.packRoot[x[0]], 0);
+  const roots = [...rc].sort((a, b) => b[1] - a[1]);
+  $('#roots').innerHTML = roots.map(([name, n]) =>
+    `<label><input type="checkbox" data-r="${esc(name)}" checked>${esc(name)}<span class="n">${num(n)}</span></label>`).join('');
+  $('#roots').onchange = () => {
+    const on = [...document.querySelectorAll('#roots input:checked')].map(i => i.dataset.r);
+    st.roots = on.length === roots.length ? null : new Set(on);
+    render();
+  };
+  $('#rootsAll').onclick = () => {
+    document.querySelectorAll('#roots input').forEach(i => { i.checked = true; });
+    st.roots = null; render();
+  };
+  $('#hideBulk').onchange = e => { st.hideBulk = e.target.checked; render(); };
+  $('#minBulk').onchange = e => { st.minBulk = Math.max(0, +e.target.value || 0); render(); };
+  document.querySelectorAll('input[name=group]').forEach(i => { i.onchange = () => { st.group = i.value; render(); }; });
+  $('#acp').onchange = e => { if (e.target.files[0]) loadMod(e.target.files[0]); };
+  let depth = 0;                  // dragenter/leave fire per element crossed
+  const hasFile = e => e.dataTransfer && [...e.dataTransfer.types].includes('Files');
+  document.addEventListener('dragenter', e => { if (hasFile(e)) { depth++; document.body.classList.add('drop'); } });
+  document.addEventListener('dragleave', e => { if (hasFile(e) && --depth <= 0) { depth = 0; document.body.classList.remove('drop'); } });
+  document.addEventListener('dragover', e => { if (hasFile(e)) e.preventDefault(); });
+  document.addEventListener('drop', e => {
+    if (!hasFile(e)) return;
+    e.preventDefault(); depth = 0; document.body.classList.remove('drop');
+    if (e.dataTransfer.files[0]) loadMod(e.dataTransfer.files[0]);
+  });
+  let timer;
+  $('#q').oninput = e => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { st.q = e.target.value.trim().toLowerCase(); render(); }, 180);
+  };
+  $('#foot').textContent = `Generated ${M.generated} by ${w('tool', 'aow4diff.py update')}. Resources are matched by id and compared byte for byte, `
+    + 'so every difference is detected; what a difference means is only as good as the decoder. Cosmetic differences '
+    + '(grid position, editor metadata, a reference\'s drifted display name) are counted but not listed.';
+}
+function resetFilters() {
+  st.q = ''; $('#q').value = '';
+  st.facets = new Set(M.facets.map((_, i) => i));
+  st.roots = null;
+  document.querySelectorAll('#facets input, #roots input').forEach(i => { i.checked = true; });
+  render();
+}
+
+buildControls();
+render();
+</script>
+</body>
+</html>

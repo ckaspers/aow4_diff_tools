@@ -1,0 +1,15 @@
+# Game data: snapshots are copies of the game's packs, reports and caches are built from them.
+# Paradox's files must not end up on GitHub.
+snapshots/
+reports/
+cache/
+
+# Your own paths (game folder, Mods folder). config.example.json is the shared template.
+config.json
+
+# Scratch work: test scripts, logs, file backups and test reports
+_dev/
+
+# Python
+__pycache__/
+*.pyc
