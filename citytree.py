@@ -119,7 +119,7 @@ def build(game, site):
     warn = []
     dump = json.load(open(os.path.join(site, 'Data', 'EN', 'StructureUpgrades.json'), encoding='utf-8-sig'))
     tomes = json.load(open(os.path.join(site, 'Data', 'EN', 'Tomes.json'), encoding='utf-8-sig'))
-    tome_of = {s['upgrade_slug']: t['resid'] for t in tomes for s in t.get('skills', []) if s.get('upgrade_slug')}
+    tome_of = {s['upgrade_slug']: str(t['resid']) for t in tomes for s in t.get('skills', []) if s.get('upgrade_slug')}
 
     # ---- the city buildings the website shows ----
     B = {}
@@ -130,7 +130,9 @@ def build(game, site):
             warn.append('not in the game or the mod: %s (%s)' % (e['id'], e['resid'])); continue
         f = fields(game.node(rid))
         uname = game.name(rid)
-        if uname.startswith(('Outpost -', '(Unused)')) or SKIP_PACKS.search(game.pack[rid]): continue
+        # outposts aren't cities; the Hero Cap buildings and the Hut's Forager's Market are abandoned
+        # but still in the game
+        if uname.startswith(('Outpost -', '(Unused)', 'Hero Cap -', 'Hut -')) or SKIP_PACKS.search(game.pack[rid]): continue
         # a property nothing grants: how the game (and the mod) switches a building off
         if any('Unreachable' in p for p in names(f.get('MustHaveStructureProperties')) + names(f.get('RequiredStructureProperties'))):
             continue
@@ -223,8 +225,11 @@ def build(game, site):
         if any(p in ROOT_OF and ROOT_OF[p] == 'throne' for p in allreq) or 'ThronesOfBlood' in b['pack']:
             b['section'] = 'throne'
             b['variant'] = ('vampire' if 'Vampire Castle' in b['uname'] or 'ThronesOfBlood' in b['pack']
-                            else None if AFFINITY.search(b['uname']) or b['uname'].startswith('Hero Cap')
+                            else None if AFFINITY.search(b['uname'])
                             else 'wizard' if b['uname'].startswith("Wizard's Tower") else None)
+        elif b['cultures'] and not b['replaces'] and any(re.match(r'^City Tier \d - .* - ID$', p) for p in allreq):
+            # a culture's own building on its town hall (Shrine of the Wargod), even when it defends
+            b['section'] = 'city'
         elif ('Defense Structure' in b['gives'] or 'Fortification Building Requisite' in b['requisites']
               or any(t.startswith('Economy.ResourceType.Defense') for t in b['tags'])):
             b['section'] = 'fortification'
@@ -236,6 +241,10 @@ def build(game, site):
     gives = {}
     for rid, b in B.items():
         for p in b['gives']: gives.setdefault(p, []).append(rid)
+    def tier_of(p):
+        """(N, family) of a "Tier N - <family>" property, else None"""
+        m = re.match(r'^"?Tier (\d) - (.+?)"?$', p)
+        return (int(m.group(1)), m.group(2)) if m else None
     def th_of(p):
         m = (re.match(r'^Tier (\d) - Town Hall$', p) or re.match(r'^Town Hall Tier (\d) - Base City Level - ID$', p)
              or re.match(r'^City Tier (\d) - .* - ID$', p))
@@ -255,9 +264,17 @@ def build(game, site):
                 if not gives.get(p) and not townhall and not p.endswith('Player Property'):
                     warn.append('%s needs %r, which no building grants' % (b['id'], p))
             return out
+        # of "Tier N - <family>" requirements only the highest N counts: a mod can raise MustHave to
+        # tier 2 while Required still says tier 1 (Soul Forge), and then tier 2 is the real gate
+        top = {}
+        for p in b['req'] + b['must']:
+            t = tier_of(p)
+            if t: top[t[1]] = max(top.get(t[1], 0), t[0])
+        def gate(props): return [p for p in props if not tier_of(p) or tier_of(p)[0] == top[tier_of(p)[1]]]
+        req, must = gate(b['req']), gate(b['must'])
         # the building it upgrades from, else what it needs besides; town halls only when that is all
-        par = (providers(b['req'], False) or providers(b['must'], False)
-               or providers(b['req'], True) or providers(b['must'], True)
+        par = (providers(req, False) or providers(must, False)
+               or providers(req, True) or providers(must, True)
                or [ROOT_OF[p] for p in b['req'] + b['must'] if p in ROOT_OF]
                or ['throne' if b['section'] == 'throne' else 'town_hall_i_town_center'])
         b['parents'] = list(dict.fromkeys(B[p]['resid'] if p in B else p for p in par))
@@ -266,7 +283,7 @@ def build(game, site):
     def line_of(b):
         if b['city_tier']: return 'townhall'
         if b['section'] == 'throne':
-            return 'affinity' if AFFINITY.search(b['uname']) else 'heroes' if b['uname'].startswith('Hero Cap') else 'tower'
+            return 'affinity' if AFFINITY.search(b['uname']) else 'tower'
         if b['section'] != 'city': return b['section']
         fam = [m.group(1) for p in b['gives'] + b['req'] for m in [re.match(r'^Tier \d - (.+)$', p)] if m]
         for f, l in LINES:
