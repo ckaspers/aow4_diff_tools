@@ -36,6 +36,10 @@ goes public, that one is a judgement call the user makes.
   3: '[#ID]cat\row'}`. **No base copy and no timestamp**: nothing says when or from which build an
   override was copied.
 - **Text**: game `Language/EN/EN.MO`; mod `.po` (read the .po, it is what the user edits).
+  The mod's `Language/EN.po` is the user's own conversion of the game's EN.MO (made with their
+  ConvertMOtoPO.py, refreshed by hand) for viewing and copying strings. The game does not load it
+  and it goes stale after an update, so `tooltips.load_texts` skips any .po named after a game
+  language folder.
 
 ## The schema (`extract_schema.py` → `schema_db.json`)
 
@@ -92,5 +96,10 @@ TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
 
 ## Open ideas the user has not taken up yet
 
-- Old builds via Steam depot downloads to date each override and list game additions a copy lacks.
 - A browser version for other modders (GitHub Pages + Pyodide, user picks their own game folder).
+
+## Decided against
+
+- Old builds via Steam depot downloads (to date each override and list game additions a copy
+  lacks): too much disk space, not needed. History is built going forward from the user's own
+  snapshots; they prune old ones by hand when space runs short. Don't suggest it again.

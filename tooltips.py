@@ -34,15 +34,22 @@ def read_po(path):
     return out
 
 def load_texts(game, mod_dir):
-    """msgid -> English text: the mod's .po files over the game's EN.MO"""
+    """msgid -> English text: the mod's .po files over the game's EN.MO.
+    A .po named after a game language (EN.po, DE.po, ...) is a copy of the game's own text made
+    for reference, not loaded by the game and stale after an update: it is skipped."""
     txt = {}
     p = os.path.join(game, 'Language', 'EN', 'EN.MO')
     if os.path.exists(p): txt.update(read_mo(p))
+    game_langs = set()
+    if os.path.isdir(os.path.join(game, 'Language')):
+        game_langs = {d.upper() for d in os.listdir(os.path.join(game, 'Language'))}
     lang = os.path.join(mod_dir, 'Language')
     if os.path.isdir(lang):
         for root, _, files in os.walk(lang):
             for f in files:
-                if f.lower().endswith('.po'): txt.update(read_po(os.path.join(root, f)))
+                base, ext = os.path.splitext(f)
+                if ext.lower() == '.po' and base.upper() not in game_langs:
+                    txt.update(read_po(os.path.join(root, f)))
     return txt
 
 def unq(v):

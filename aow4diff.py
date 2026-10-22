@@ -93,18 +93,7 @@ def content_dir(game):
     return c if os.path.isdir(c) else game
 
 def build_label(game):
-    """Steam build id when the app manifest is reachable, else the exe's date"""
-    try:
-        common = os.path.dirname(os.path.abspath(game))
-        steamapps = os.path.dirname(common)
-        for f in os.listdir(steamapps):
-            if f.startswith('appmanifest_') and f.endswith('.acf'):
-                t = open(os.path.join(steamapps, f), encoding='utf-8', errors='replace').read()
-                if '"Age of Wonders 4"' in t or 'Age of Wonders 4' in t:
-                    m = re.search(r'"buildid"\s+"(\d+)"', t)
-                    if m: return 'build ' + m.group(1)
-    except Exception:
-        pass
+    """the exe's date: stable whatever can be read, and the game rarely updates twice a day"""
     for exe in ('AOW4.exe', 'ResourceED.exe'):
         p = os.path.join(game, exe)
         if os.path.exists(p):

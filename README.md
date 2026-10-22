@@ -62,7 +62,8 @@ Paths live in `config.json` (game folder, Mods folder, snapshots, reports).
 
 ## Tooltip keys (mod reports)
 
-The mod report checks every tooltip in your overrides against its text (your .po, else the game's EN.MO):
+The mod report checks every tooltip in your overrides against its text (your .po, else the game's EN.MO;
+a `.po` named after a game language, such as `EN.po`, is a reference copy of the game's text and is skipped):
 
 - **Placeholders nothing fills**: a `{placeholder}` with no typed-in value and no data store of that
   name anywhere in the game or the mod. Data stores that exist are trusted: the check does not follow
@@ -90,8 +91,8 @@ Code: `stale.py`.
 * Trigger scripts are rendered from the registry as `Type[Function, args]` pseudo-code; a few
   constructs (variables, some operators) read rougher than in the editor.
 * Tag-filter condition modes are labelled from the editor's strings by best guess.
-* Without Steam's app manifest in reach the build is labelled by the exe date
-  (`exe of 2026-10-16`) instead of the Steam build id.
+* Builds are labelled by the exe date (`exe of 2026-10-16`), so two game updates on the same day
+  share a label: the second one's mod report replaces the first, and `after-update` sees no new build.
 * Byte-level changes in assets (textures, sounds, FX data) show as "undecoded".
 
 `template.html` is the viewer page from the reports you were sent, with the data swapped in.
