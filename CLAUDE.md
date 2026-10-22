@@ -4,23 +4,21 @@ Tools that read Age of Wonders 4 game data (`.rpk` packs) and a mod's override f
 write interactive HTML reports. Read `README.md` for usage. This file holds what is not obvious
 from the code: the file formats, the editor's meaning of things, and decisions already made.
 
-## The user and the mod
+## Users and paths
 
-- The user maintains the mod **AoW 4 Evolved** (~1,540 overrides plus its own packs under the mod's
-  `Packs/` folder and its text in `Language/AoW 4 Evolved.po`). They edit it in Paradox's
-  **ResourceED** editor. Folder paths are in `config.json` (not in Git).
-- They know the editor and the game well; trust their account of editor behaviour over a guess,
-  and check the data before telling them something is wrong. Explain findings in editor terms
+- Modders edit their mod in Paradox's **ResourceED** editor. Explain findings in editor terms
   (field names as ResourceED shows them, "unmod / mod again", "Localized String Dialog").
-- After every game update they run `after_update.bat`: schema rebuild if ResourceED.exe changed,
-  update report (latest snapshot vs live), mod report, new snapshot. Keep at least the two newest
+- Folder paths are in `config.json` (not in Git). Notes about the maintainer's own mod are in
+  `CLAUDE.local.md` (git-ignored): keep mod names and personal details out of committed files.
+- After every game update, `after_update.bat`: schema rebuild if ResourceED.exe changed, update
+  report (latest snapshot vs live), mod report, new snapshot. Keep at least the two newest
   snapshots: the previous one is the only way to rebuild the last update report.
 
 ## Never commit game data
 
 `snapshots/`, `reports/`, `cache/` hold or are built from Paradox's files and are git-ignored.
-`schema_db.json` is committed (field names read out of ResourceED.exe, needed to run). If the repo
-goes public, that one is a judgement call the user makes.
+`schema_db.json` is committed and published by the web version (field names read out of
+ResourceED.exe, needed to run; the maintainer decided that is fine).
 
 ## File formats
 
@@ -36,10 +34,9 @@ goes public, that one is a judgement call the user makes.
   3: '[#ID]cat\row'}`. **No base copy and no timestamp**: nothing says when or from which build an
   override was copied.
 - **Text**: game `Language/EN/EN.MO`; mod `.po` (read the .po, it is what the user edits).
-  The mod's `Language/EN.po` is the user's own conversion of the game's EN.MO (made with their
-  ConvertMOtoPO.py, refreshed by hand) for viewing and copying strings. The game does not load it
-  and it goes stale after an update, so `tooltips.load_texts` skips any .po named after a game
-  language folder.
+  A mod may hold a `.po` named after a game language (`EN.po`): a modder's own copy of the game's
+  EN.MO for viewing and copying strings. The game does not load it and it goes stale after an
+  update, so `tooltips.load_texts` skips any .po named after a game language folder.
 
 ## The schema (`extract_schema.py` → `schema_db.json`)
 
@@ -83,23 +80,29 @@ TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
 - `template.html` the viewer; the report data is injected as JSON at `__DATA__`. Mod-report
   sections: Not merged, Tooltip keys, Possibly old content, Deleted, No target, Layout-only,
   Repeated, Overrides.
+- `web/` the browser version of the mod report (GitHub Pages). `index.html` takes the folders
+  through `<input webkitdirectory>`. `worker.js` runs Pyodide, mounts them with WORKERFS (lazy
+  reads, read-only) at `/game` and `/mod`, and calls `cmd_mod` unchanged with no history; the caches live
+  in IDBFS at `/app/cache`. The worker's `APP` list is what gets served (`build_site.py` reads it).
+  Why not `showDirectoryPicker`: it is Chromium-only and is expected to refuse Program Files and
+  %APPDATA% (Steam's default and the Mods folder). WORKERFS gives blobs "now" as their date, so the
+  worker sets `node.timestamp` from `File.lastModified` (build label and cache keys need it).
+  Python code that runs there must not write next to its inputs (pass `out`).
 
 ## Working on it
 
 - Check a resource with `python aow4diff.py dump "<name>" [--acp "<mod.acp>"]`; diff the two dumps.
 - After a change, regenerate with `python aow4diff.py mod` and open the report; check the browser
   console for errors. A whole mod report takes ~30-45 s.
-- `AoW 4 Evolved.acp.bak` (in the mod folder) is an older copy of the mod: a useful regression
-  input (`--acp ... --out _dev/bak.html`), e.g. it still has the stale Lost Tomb prediction.
+- An older copy of a mod's `.acp` is a useful regression input (`--acp ... --out _dev/bak.html`).
 - `_dev/` is git-ignored scratch (test scripts, backups).
 - Reports must make sense to the user without code knowledge: plain section text, editor names.
-
-## Open ideas the user has not taken up yet
-
-- A browser version for other modders (GitHub Pages + Pyodide, user picks their own game folder).
 
 ## Decided against
 
 - Old builds via Steam depot downloads (to date each override and list game additions a copy
   lacks): too much disk space, not needed. History is built going forward from the user's own
   snapshots; they prune old ones by hand when space runs short. Don't suggest it again.
+- Update reports in the web version (a drop-in box, or publishing the update data with the site):
+  only the maintainer can make them, and publishing them means decoded game data in a public repo.
+  The web version stays a plain mod-vs-live comparison; "Not merged" is desktop only.

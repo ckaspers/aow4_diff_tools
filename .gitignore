@@ -13,3 +13,9 @@ _dev/
 # Python
 __pycache__/
 *.pyc
+
+# Built browser version (web/build_site.py)
+_site/
+
+# Personal notes for Claude (your own mod, test inputs)
+CLAUDE.local.md

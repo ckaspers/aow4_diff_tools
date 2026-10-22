@@ -9,6 +9,19 @@ Reports in the same interactive HTML viewer as the `update_…_to_….html` / `t
   new content, schema changes, systemic changes and every changed field. The page also has
   the *Check a mod (.acp)* button: drop your mod on it to see which overrides the update hit.
 
+## In the browser (no install)
+
+The mod report also runs in the browser: <https://ckaspers.github.io/aow4_diff_tools/>.
+Pick the game folder (the one with `AOW4.exe`) and your mod's folder. The page runs this same Python code in the browser (Pyodide),
+reading the files where they are. Nothing is uploaded, although the browser's prompt says
+"upload": that is its standard wording for giving a page a folder. No snapshot is needed: the mod
+report compares the mod with the game as installed now. Update reports, and the "Not merged"
+section they feed, are desktop only.
+
+The site is `web/` plus the files its worker loads, put together by `web/build_site.py` and
+published by `.github/workflows/pages.yml` on every push to `main`. To try it locally:
+`python web/build_site.py`, then `python -m http.server -d _site` and open <http://localhost:8000>.
+
 ## The routine after every game update
 
 ```

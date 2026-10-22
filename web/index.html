@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AoW4 mod check</title>
+<style>
+:root {
+  --bg: #f6f5f1; --panel: #ffffff; --line: #dcd9d0; --text: #22211e; --dim: #6d6a62;
+  --accent: #7a4b12; --accent-bg: #f4ebdd; --add: #1c6b3a; --add-bg: #e2f2e6; --rem: #a3261d;
+  --warn: #8a5a00; --warn-bg: #fdf1d3;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17171a; --panel: #1f1f23; --line: #34343a; --text: #e6e4de; --dim: #9a978f;
+    --accent: #e0a85a; --accent-bg: #2f2618; --add: #7ed39a; --add-bg: #17301f; --rem: #f09a90;
+    --warn: #f0c060; --warn-bg: #3a2d10;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12.5px;
+  overflow-wrap: anywhere; }
+a { color: var(--accent); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+
+header { background: var(--panel); border-bottom: 1px solid var(--line); }
+header .wrap { display: flex; align-items: center; gap: 16px; padding-top: 12px; padding-bottom: 12px; }
+header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+header h1 span { color: var(--dim); font-weight: 400; }
+header nav { margin-left: auto; font-size: 13px; }
+
+.intro { padding: 40px 0 28px; text-align: center; }
+.intro h2 { font-size: 26px; line-height: 1.25; margin: 0 auto 10px; font-weight: 650; letter-spacing: -.01em; max-width: 40ch; }
+.intro p { color: var(--dim); margin: 0 auto; max-width: 72ch; font-size: 15px; }
+
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.step { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px;
+  display: flex; flex-direction: column; gap: 10px; transition: border-color .2s; }
+.step.done { border-color: var(--add); }
+.step h3 { display: flex; align-items: center; gap: 10px; font-size: 15px; margin: 0; }
+.num { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 13px; font-weight: 700; background: var(--accent-bg); color: var(--accent); }
+.step.done .num { background: var(--add-bg); color: var(--add); }
+.step.done .num::before { content: "\2713"; }
+.step.done .num span { display: none; }
+.step p { margin: 0; color: var(--dim); font-size: 13px; }
+.step .foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+
+.btn { font: inherit; font-size: 13px; padding: 6px 14px; border: 1px solid var(--accent); color: var(--accent);
+  background: none; border-radius: 6px; cursor: pointer; white-space: nowrap; text-decoration: none; }
+.btn:hover { background: var(--accent-bg); }
+.btn.go { width: 100%; padding: 10px 14px; font-size: 15px; font-weight: 600; background: var(--accent);
+  color: var(--panel); text-align: center; }
+.btn.go:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: .4; cursor: default; filter: none; }
+.got { font-size: 13px; min-height: 1.5em; }
+.got.ok { color: var(--add); }
+.got.bad { color: var(--rem); }
+select { font: inherit; font-size: 13px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--bg); color: var(--text); width: 100%; }
+
+#status { font-size: 13px; color: var(--dim); min-height: 1.5em; }
+#status b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; visibility: hidden; }
+.busy .bar { visibility: visible; }
+.bar i { display: block; height: 100%; width: 35%; border-radius: 2px; background: var(--accent);
+  animation: slide 1.4s ease-in-out infinite; }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+
+#notes:not(:empty) { margin-top: 16px; }
+.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); border-radius: 6px;
+  padding: 8px 12px; font-size: 13px; margin: 0 0 8px; }
+pre.err { white-space: pre-wrap; font-size: 12px; color: var(--rem); background: var(--panel);
+  border: 1px solid var(--rem); border-radius: 6px; padding: 10px 12px; max-height: 320px; overflow: auto; margin: 0; }
+
+#result { padding: 0 24px; margin-top: 28px; }
+#result .row { max-width: 1180px; margin: 0 auto 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+#result iframe { display: block; width: 100%; height: 88vh; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--panel); }
+
+.about { padding: 44px 0 16px; }
+.about h3, .facts h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin: 0 0 12px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.tile { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.tile b { display: block; font-size: 13.5px; margin-bottom: 2px; }
+.tile span { color: var(--dim); font-size: 13px; }
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; padding: 28px 0 48px;
+  border-top: 1px solid var(--line); margin-top: 32px; }
+.facts p { margin: 0; color: var(--dim); font-size: 13px; }
+
+@media (max-width: 860px) {
+  .steps, .facts { grid-template-columns: minmax(0, 1fr); }
+  .intro { padding-top: 28px; }
+  .intro h2 { font-size: 22px; }
+  .wrap { padding: 0 16px; }
+  #result { padding: 0 16px; }
+  header nav { display: none; }
+}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1>AoW4 mod check <span>· Age of Wonders 4</span></h1>
+  <nav><a href="https://github.com/ckaspers/aow4_diff_tools">Source and desktop version</a></nav>
+</div></header>
+
+<main class="wrap">
+  <section class="intro">
+    <h2>See what your mod changes, and what the game changed under it</h2>
+    <p>Compares every resource your mod overrides with the game as it is installed now, field by field,
+      using the names the ResourceED editor shows. Pick two folders and check: the report opens on this page.</p>
+  </section>
+
+  <section class="steps">
+    <div class="step" id="stepGame">
+      <h3><span class="num"><span>1</span></span>Game folder</h3>
+      <p>The folder that holds <code>AOW4.exe</code>. In Steam: right-click Age of Wonders 4 › Manage › Browse local files.
+        Usually <code>C:\Program Files (x86)\Steam\steamapps\common\Age of Wonders 4</code></p>
+      <div class="foot">
+        <label class="btn"><input type="file" id="game" webkitdirectory hidden>Choose game folder</label>
+        <span class="got" id="gameGot"></span>
+      </div>
+    </div>
+    <div class="step" id="stepMod">
+      <h3><span class="num"><span>2</span></span>Mod folder</h3>
+      <p>Your mod's folder, the one with its <code>.acp</code> file. Usually
+        <code>%APPDATA%\Paradox Interactive\Age of Wonders 4\Mods\&lt;your mod&gt;</code>
+        (type <code>%APPDATA%</code> in the dialog's address bar).</p>
+      <div class="foot">
+        <label class="btn"><input type="file" id="mod" webkitdirectory hidden>Choose mod folder</label>
+        <select id="acp" hidden></select>
+        <span class="got" id="modGot"></span>
+      </div>
+    </div>
+    <div class="step" id="stepRun">
+      <h3><span class="num"><span>3</span></span>Check</h3>
+      <p>Takes about half a minute; the first run on a new game build a little longer.
+        Your browser asks whether to "upload" each folder: that is its wording for letting a page read a folder.
+        Nothing is sent anywhere.</p>
+      <div class="foot" style="align-items: stretch">
+        <button class="btn go" id="run" disabled>Check the mod</button>
+        <div class="bar"><i></i></div>
+        <span id="status">Loading Python…</span>
+      </div>
+    </div>
+  </section>
+  <div id="notes"></div>
+</main>
+
+<section id="result" hidden>
+  <div class="row"><button class="btn" id="open">Open in a new tab</button><a class="btn" id="save">Save report</a>
+    <span class="got" id="took"></span></div>
+  <iframe id="view" title="Mod report"></iframe>
+</section>
+
+<section class="wrap">
+  <div class="about">
+    <h3>What the report shows</h3>
+    <div class="tiles">
+      <div class="tile"><b>Overrides</b><span>Every field where your copy differs from the live resource: your own edits and
+        whatever the game changed since you made the copy, side by side.</span></div>
+      <div class="tile"><b>Tooltip keys</b><span>Placeholders nothing fills, and leftover keys that Ok in the Localized
+        String Dialog would drop.</span></div>
+      <div class="tile"><b>Possibly old content</b><span>Links to resources that no longer exist, and entries only your
+        copy has: your additions, or content the game has since removed.</span></div>
+      <div class="tile"><b>Deleted by the mod</b><span>Resources your mod marks deleted that are still in the game.</span></div>
+      <div class="tile"><b>No target</b><span>Overrides whose resource is gone from the game, with where it moved or
+        under which id it was re-created.</span></div>
+      <div class="tile"><b>Repeated differences</b><span>The same difference across many resources: a pass you made on
+        purpose, or a game change your copies undo.</span></div>
+      <div class="tile"><b>Layout-only</b><span>Fields at their default on both sides but saved differently. No effect
+        in game.</span></div>
+    </div>
+  </div>
+  <div class="facts">
+    <div><h3>Stays on your PC</h3><p>The check runs in your browser. Your game and mod files are read where they are
+      and never leave your computer.</p></div>
+    <div><h3>Browsers</h3><p>Any current desktop browser: Chrome, Edge, Firefox. Pick the folders again on each visit;
+      the page remembers nothing about them, apart from a scan of game data in this browser to speed up the next check.</p></div>
+    <div><h3>After a game update</h3><p>Field names are read from the editor. Until they catch up with a new game
+      build, a note says so and new fields show as <code>field_N</code>.</p></div>
+  </div>
+</section>
+
+<script>
+const $ = s => document.querySelector(s);
+const plural = (n, w) => `${n.toLocaleString()} ${w}${n === 1 ? '' : 's'}`;
+let game = null, mod = null, ready = false, busy = false, reportUrl = null, started = 0, timer = null, last = '';
+
+function got(id, text, ok) { const e = $(id); e.textContent = text; e.className = 'got ' + (ok ? 'ok' : 'bad'); }
+function canRun() {
+  $('#run').disabled = !(ready && game && mod && !busy);
+  $('#stepGame').classList.toggle('done', !!game);
+  $('#stepMod').classList.toggle('done', !!mod);
+  $('#stepRun').classList.toggle('busy', busy);
+}
+function status(text) {
+  last = text;
+  const e = $('#status');
+  if (!busy) { e.textContent = text; return; }
+  const s = Math.round((Date.now() - started) / 1000);
+  e.innerHTML = `<b>${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}</b> · `;
+  e.append(text);
+}
+
+// the game: only the folder holding the exe, and in it the packs, the text and the exes (for the date)
+$('#game').onchange = e => {
+  const all = [...e.target.files];
+  const exes = all.filter(f => /(^|\/)aow4\.exe$/i.test(f.webkitRelativePath))
+    .sort((a, b) => a.webkitRelativePath.length - b.webkitRelativePath.length);
+  if (!exes.length) { game = null; got('#gameGot', 'No AOW4.exe in this folder: choose the folder that holds it.', false); return canRun(); }
+  const dir = exes[0].webkitRelativePath.replace(/[^/]+$/, '');
+  const files = all.filter(f => f.webkitRelativePath.startsWith(dir)).filter(f => {
+    const r = f.webkitRelativePath.slice(dir.length).toLowerCase();
+    return r.endsWith('.rpk') || r.startsWith('language/') || r === 'aow4.exe' || r === 'resourceed.exe';
+  });
+  const packs = files.filter(f => /\.rpk$/i.test(f.name)).length;
+  const date = new Date(exes[0].lastModified).toISOString().slice(0, 10);
+  game = packs ? { dir: dir.slice(0, -1), files: files.map(f => [f.webkitRelativePath, f]) } : null;
+  got('#gameGot', `${plural(packs, 'pack')}, game build of ${date}`, packs > 0);
+  canRun();
+};
+
+// the mod: its .acp, its own packs and its .po text
+$('#mod').onchange = e => {
+  const all = [...e.target.files];
+  const files = all.filter(f => /\.(acp|rpk)$/i.test(f.name) || (/(^|\/)language\//i.test(f.webkitRelativePath) && /\.po$/i.test(f.name)));
+  const acps = files.filter(f => /\.acp$/i.test(f.name)).map(f => f.webkitRelativePath).sort();
+  const sel = $('#acp');
+  if (!acps.length) { mod = null; sel.hidden = true; got('#modGot', 'No .acp file in this folder: choose your mod\'s folder.', false); return canRun(); }
+  mod = { files: files.map(f => [f.webkitRelativePath, f]) };
+  sel.innerHTML = acps.map(p => `<option>${p.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</option>`).join('');
+  sel.hidden = acps.length < 2;
+  got('#modGot', acps.length === 1 ? acps[0].split('/').pop() : `${acps.length} mods: pick one`, true);
+  canRun();
+};
+
+function finish() { busy = false; clearInterval(timer); canRun(); }
+
+const worker = new Worker('worker.js');
+worker.onmessage = ({ data: { type, data } }) => {
+  if (type === 'log') {
+    status(data);
+  } else if (type === 'ready') {
+    ready = true; canRun();
+    status('Ready.');
+  } else if (type === 'note') {
+    $('#notes').insertAdjacentHTML('beforeend', '<p class="warn"></p>');
+    $('#notes').lastChild.textContent = data;
+  } else if (type === 'done') {
+    finish();
+    status('Done: the report is below.');
+    if (reportUrl) URL.revokeObjectURL(reportUrl);
+    reportUrl = URL.createObjectURL(new Blob([data.html], { type: 'text/html' }));
+    const name = $('#acp').value.split('/').pop().replace(/\.acp$/i, '');
+    $('#save').href = reportUrl;
+    $('#save').download = name.replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '') + '_vs_live.html';
+    $('#took').textContent = `took ${data.seconds} s`;
+    $('#view').src = reportUrl;
+    $('#result').hidden = false;
+    $('#result').scrollIntoView({ behavior: 'smooth' });
+  } else if (type === 'error') {
+    finish();
+    status('Something went wrong. The details below help when reporting it.');
+    $('#notes').insertAdjacentHTML('beforeend', '<pre class="err"></pre>');
+    $('#notes').lastChild.textContent = data;
+  }
+};
+worker.onerror = e => { status('The page could not start: ' + e.message); };
+
+$('#run').onclick = () => {
+  busy = true; started = Date.now(); canRun();
+  timer = setInterval(() => status(last), 1000);
+  $('#notes').innerHTML = ''; $('#result').hidden = true;
+  status('Starting…');
+  worker.postMessage({ type: 'run', game: game.files, gameDir: game.dir, mod: mod.files, acp: $('#acp').value });
+};
+$('#open').onclick = () => { if (reportUrl) window.open(reportUrl, '_blank'); };
+</script>
+</body>
+</html>

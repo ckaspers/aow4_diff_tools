@@ -244,8 +244,10 @@ def cmd_mod(args):
         by_base.setdefault(os.path.basename(rel).upper(), []).append(rel)
     acp = open(args.acp, 'rb').read()
     modname, ovs = acpread.mod_overrides(acp)
+    print('%s: %d overrides; reading resource names from %d game packs' % (modname, len(ovs), len(packs)), flush=True)
     M = Model(S, restamp_cosmetic=True)
     M.D.names = name_index(packs)
+    print('comparing the overrides with the live game', flush=True)
     live_label = 'live (%s)' % build_label(game)
     cache = {}
     def live(rel):
@@ -292,6 +294,7 @@ def cmd_mod(args):
         if any(not c.get('m') for c in r['c']): differ_packs.add(rel)
     # say why an override has no target: moved to another pack, or re-created under a new id
     if M.came:
+        print('looking up %d override%s with no target' % (len(M.came), 's' if len(M.came) != 1 else ''), flush=True)
         where = {}; byname = {}
         for rel, full in packs.items():
             if os.path.getsize(full) > 8_000_000: continue
@@ -306,11 +309,13 @@ def cmd_mod(args):
             elif x[1] in byname:
                 nid, nrel = byname[x[1]][0]
                 x[1] += '  (re-created: now id %s%s)' % (nid, '' if nrel == M.packs[x[0]] else ' in ' + nrel)
+    print('checking tooltip keys', flush=True)
     txt = tooltips.load_texts(game, os.path.dirname(os.path.abspath(args.acp)))
     gtxt = tooltips.load_texts(game, os.path.join(game, '_no_mod_'))
     mod_packs = [os.path.join(r, f) for r, _, fs in os.walk(os.path.dirname(os.path.abspath(args.acp)))
                  for f in fs if f.lower().endswith('.rpk')]     # the mod's own new resources
     M.tips = tooltips.run(M.D, tips, txt, gtxt, mod_packs + list(packs.values()), [acp])
+    print('looking for old content', flush=True)
     ids = stale.all_ids(packs, mod_packs, os.path.join(HERE, 'cache'), res_head, pack_items)
     M.stale = stale.run(M.D, tips, ids, {o['id'] for o in ovs if o['raw']})
     M.only = stale.only_in_copy(M.records)
