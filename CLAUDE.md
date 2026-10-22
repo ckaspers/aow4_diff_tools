@@ -18,7 +18,8 @@ from the code: the file formats, the editor's meaning of things, and decisions a
 
 `snapshots/`, `reports/`, `cache/` hold or are built from Paradox's files and are git-ignored.
 `schema_db.json` is committed and published by the web version (field names read out of
-ResourceED.exe, needed to run; the maintainer decided that is fine).
+ResourceED.exe, needed to run; the maintainer decided that is fine). The web version serves the
+committed copy, so a rebuilt schema reaches it only once it is committed and pushed.
 
 ## File formats
 
@@ -66,6 +67,27 @@ TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
   stale copies (e.g. a Lost Tomb event copy still carried a prediction the game had removed).
 - Removing the last entry of a list saves it as an empty list (`\0` body), not as a missing field.
 
+## City buildings (`citytree.py`)
+
+- A `TStructureUpgradeR` upgrades from whatever grants its `RequiredStructureProperties`; its
+  `MustHaveStructureProperties` are further conditions (mostly a Town Hall tier). Buildings grant
+  "Tier N - Gold"-style properties in `Structure Properties`, and "<building> - ID" ones in
+  `Colony Properties`. Some property names end in a space: strip them.
+- "Tier 1 - Town Hall" / "Town Hall Tier 1 - …" and "Throne City ID" / "Transfer With Throne ID
+  Property" are granted by no building: they are the two roots (Town Hall I, the Throne).
+- A property nothing grants ("Wizard Tower - Unreachable Player Property") is how a building is
+  switched off; mods use it too.
+- Culture swaps: each `TCityCultureSettingsR` (City Settings) has `StructureUpgradeReplacementList`
+  (generic → culture building). Cultures with sub-cultures keep the swaps on the sub-culture's
+  settings; Mystic keeps them on the culture's. Culture keys come from the faction property giver's
+  `TelemetryName` (left out at its default: Industrious), which matches the site's icon names.
+- `TPropertyUnlockSettings` unlocks buildings for a player property: tome skills, sub-cultures
+  (Mystic schools, Oathsworn oaths). Primal's animal sub-cultures have no City Settings, only these.
+- The dump's structure `id` is not unique (Keep, Castle and Commune share one): key by `resid`.
+- Culture, sub-culture and Throne icons are not in the DUMPALL export. `TGameIconR` points into a
+  texture atlas in `Content/Title/Libraries/Icons/*.clb` (KTX/BC7 entries named after the source
+  .png); nothing reads those yet.
+
 ## Code map
 
 - `aow4lib.py` record parsing, `Schema`. `decode.py` `Decoder` → nodes: `('o', cls, [(label,
@@ -77,6 +99,8 @@ TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
   `mark_unmerged` (labels mod differences that undo a change listed in an update report in
   `reports/`).
 - `tooltips.py` tooltip key checks. `stale.py` dead links + "entries only your copy has".
+- `citytree.py` standalone: city tree links for the website (`Game` = game + mod packs +
+  overrides, `build` → roots, cultures, structures). Imports the modules above, changes none.
 - `template.html` the viewer; the report data is injected as JSON at `__DATA__`. Mod-report
   sections: Not merged, Tooltip keys, Possibly old content, Deleted, No target, Layout-only,
   Repeated, Overrides.
@@ -94,6 +118,9 @@ TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
 - Check a resource with `python aow4diff.py dump "<name>" [--acp "<mod.acp>"]`; diff the two dumps.
 - After a change, regenerate with `python aow4diff.py mod` and open the report; check the browser
   console for errors. A whole mod report takes ~30-45 s.
+- Web version: `python web/build_site.py`, then `python -m http.server -d _site` and open
+  http://localhost:8000 with Ctrl+F5 (the browser caches the worker). Rebuild after changing `web/`
+  or any file the worker loads. Its report should match `aow4diff.py mod` apart from "Not merged".
 - An older copy of a mod's `.acp` is a useful regression input (`--acp ... --out _dev/bak.html`).
 - `_dev/` is git-ignored scratch (test scripts, backups).
 - Reports must make sense to the user without code knowledge: plain section text, editor names.

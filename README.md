@@ -47,8 +47,10 @@ Other commands:
 | `python aow4diff.py snapshot [--label NAME]` | snapshot only |
 | `python aow4diff.py dump "<resource name>" [--acp mod.acp]` | print how one resource decodes |
 | `python extract_schema.py --exe "<game>\ResourceED.exe"` | rebuild the schema by hand |
+| `python citytree.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | city tree links for an aow4db-style website (see below) |
 
-Paths live in `config.json` (game folder, Mods folder, snapshots, reports).
+Paths live in `config.json` (game folder, Mods folder, snapshots, reports, and `"site"` for
+`citytree.py`).
 
 ## Setup on Windows
 
@@ -98,6 +100,17 @@ Signs that an override is an old copy holding content the game has since removed
   rest is old game content. Re-making the override clears it.
 
 Code: `stale.py`.
+
+## City tree for a website
+
+`citytree.py` writes `Data/GEN/CityTreeLinks.json` for an aow4db-style website: which city building
+follows which, which culture, sub-culture or tome it belongs to, and the Town Hall tier it needs, read
+from the live game with the mod on top. It holds only links (resource ids, culture keys and text ids);
+the site's own `StructureUpgrades.json`, `Tomes.json` and `all.json` supply names, icons and texts.
+
+Run it after copying a new DUMPALL dump into the site. Give the site's folder with `--site`, or set
+`"site"` in `config.json`. It reads the first mod in your Mods folder on top of the game; `--acp`
+picks another, `--no-mod` reads the game alone.
 
 ## Known limits
 

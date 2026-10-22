@@ -1,11 +1,12 @@
-"""City tree links for the Evolved website: which city building follows which, and which culture,
-sub-culture or tome it belongs to, read from the live game plus the mod.
+"""City tree links for an aow4db-style website: which city building follows which, and which culture,
+sub-culture or tome it belongs to, read from the live game, with a mod on top if one is given.
 
-    python citytree.py [--out PATH] [--acp MOD.acp]
+    python citytree.py --site PATH [--out PATH] [--acp MOD.acp | --no-mod]
 
 Run it after copying a new DUMPALL dump into the website: it reads the site's
-Data/EN/StructureUpgrades.json and Data/EN/Tomes.json, and writes Data/GEN/CityTreeLinks.json
-(the site folder is config.json's "site", else an "evolved" folder next to this repository).
+Data/EN/StructureUpgrades.json and Data/EN/Tomes.json, and writes Data/GEN/CityTreeLinks.json.
+The site folder is --site, else config.json's "site". The mod is --acp, else the first .acp in the
+Mods folder; --no-mod (or no mod installed) reads the game alone.
 
 The output holds links and keys only; names, icons, costs and descriptions stay in the dump and are
 looked up by resid (the resource id in decimal; the dump's "id" is not unique):
@@ -28,9 +29,6 @@ import argparse, datetime, json, os, re, sys
 
 import aow4diff, acpread, tooltips
 from decode import Decoder
-
-# the website's repository: config.json's "site", else an "evolved" folder next to this one
-DEFAULT_SITE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'evolved')
 
 # properties a city has from the start: the two roots of the tree
 ROOTS = {
@@ -77,15 +75,17 @@ def snake(s): return re.sub(r'[^a-z0-9]+', '_', s.lower()).strip('_')
 
 
 class Game:
-    """the game's resources with the mod's packs and overrides on top"""
-    def __init__(self, cfg, acp):
+    """the game's resources, with a mod's packs and overrides on top when one is given"""
+    def __init__(self, cfg, acp=None):
         self.dir = cfg['game']
         self.S = aow4diff.load_schema()
         self.D = Decoder(self.S)
         self.raw, self.pack = {}, {}
+        self._node = {}
         for rel, full in aow4diff.scan_game(aow4diff.content_dir(cfg['game'])).items():
             if os.path.getsize(full) > 8_000_000: continue
             self._add(open(full, 'rb').read(), rel)
+        if not acp: return
         packs = os.path.join(os.path.dirname(acp), 'Packs')
         if os.path.isdir(packs):
             for f in os.listdir(packs):
@@ -94,7 +94,6 @@ class Game:
             if not o['id']: continue
             if o['raw']: self.raw[o['id']] = o['raw']
             else: self.raw.pop(o['id'], None)
-        self._node = {}
 
     def _add(self, b, rel):
         for raw in aow4diff.pack_items(b)[0]:
@@ -304,17 +303,19 @@ def build(game, site):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('--site', help='the website\'s folder (default: "site" in config.json)')
     ap.add_argument('--out', help='output file (default: <site>/Data/GEN/CityTreeLinks.json)')
     ap.add_argument('--acp', help='the mod (default: the first .acp in the Mods folder)')
+    ap.add_argument('--no-mod', action='store_true', help='read the game alone')
     args = ap.parse_args()
     cfg = aow4diff.load_config()
-    site = cfg.get('site') or DEFAULT_SITE
-    acp = args.acp or (aow4diff.mod_acps(cfg) or [None])[0]
-    if not acp: sys.exit('no mod .acp found')
+    site = args.site or cfg.get('site')
+    if not site: sys.exit('which website? pass --site or set "site" in config.json')
+    acp = None if args.no_mod else args.acp or (aow4diff.mod_acps(cfg) or [None])[0]
     game = Game(cfg, acp)
     data, warn, B = build(game, site)
     data = {'generated': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), 'build': aow4diff.build_label(cfg['game']),
-            'mod': os.path.splitext(os.path.basename(acp))[0], **data}
+            'mod': os.path.splitext(os.path.basename(acp))[0] if acp else None, **data}
     out = args.out or os.path.join(site, 'Data', 'GEN', 'CityTreeLinks.json')
     with open(out, 'w', encoding='utf-8', newline='\n') as f:
         json.dump(data, f, indent=1, ensure_ascii=False)
