@@ -24,6 +24,8 @@ How the game links buildings (checked against the editor's data):
 - Each culture and sub-culture has a City Settings resource (TCityCultureSettingsR) whose
   StructureUpgradeReplacementList swaps a generic building for its own.
 - TPropertyUnlockSettings unlock buildings for a player property: a tome skill, a sub-culture, ...
+- City Core (TCityR) lists the generic buildings a city can build; a generic one missing there is
+  abandoned.
 """
 import argparse, datetime, json, os, re, sys
 
@@ -235,6 +237,16 @@ def build(game, site):
             b['section'] = 'fortification'
         else:
             b['section'] = 'city'
+    # City Core lists the buildings every city can build; one that is on no culture's or unlock's list
+    # and not there either is abandoned but still in the game (Woodworker, Forester's Guild).
+    # Thrones of Blood brings its Vampire Castle in its own way
+    core = [r for r in game.of_class('TCityR') if game.name(r) == 'City Core']
+    offered = {i for r in core for n, i in refs(fields(fields(fields(game.node(r)).get('field_8')).get('field_2')).get('Upgrades'))}
+    if not offered: warn.append('City Core lists no buildings: abandoned ones are not left out')
+    for rid, b in B.items():
+        if (offered and rid not in offered and rid not in unlocked_by and not b['cultures']
+                and b.get('section') != 'tome' and 'ThronesOfBlood' not in b['pack']):
+            b['skip'] = True
     B = {r: b for r, b in B.items() if not b.get('skip')}
 
     # ---- parents: who grants the properties a building needs ----
