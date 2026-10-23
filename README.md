@@ -48,9 +48,10 @@ Other commands:
 | `python aow4diff.py dump "<resource name>" [--acp mod.acp]` | print how one resource decodes |
 | `python extract_schema.py --exe "<game>\ResourceED.exe"` | rebuild the schema by hand |
 | `python citytree.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | city tree links for an aow4db-style website (see below) |
+| `python magicmaterials.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | magic material sets, texts and income for the same website (see below) |
 
 Paths live in `config.json` (game folder, Mods folder, snapshots, reports, and `"site"` for
-`citytree.py`).
+`citytree.py` and `magicmaterials.py`).
 
 ## Setup on Windows
 
@@ -111,6 +112,16 @@ the site's own `StructureUpgrades.json`, `Tomes.json` and `all.json` supply name
 Run it after copying a new DUMPALL dump into the site. Give the site's folder with `--site`, or set
 `"site"` in `config.json`. It reads the first mod in your Mods folder on top of the game; `--acp`
 picks another, `--no-mod` reads the game alone.
+
+## Magic materials for a website
+
+`magicmaterials.py` writes `Data/GEN/MagicMaterials.json`: each magic material set with its bonus and
+how many materials it needs (a field the decoder hides at its default of 3, different ones unless the
+set turns that off), and each material's name, global effect, lore, local income and combat
+enchantment. Texts are the game's or the mod's own, filled in with the values of the resource that
+shows them, so they follow game updates and the mod; the site's upstream `all.json` does neither.
+Concept links are written the way the site's `all.json` writes them, icons included. Run it after each
+dump, with the same `--site`, `--acp` and `--no-mod` as `citytree.py`.
 
 ## Known limits
 

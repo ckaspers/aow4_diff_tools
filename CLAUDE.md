@@ -101,6 +101,9 @@ TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
 - `tooltips.py` tooltip key checks. `stale.py` dead links + "entries only your copy has".
 - `citytree.py` standalone: city tree links for the website (`Game` = game + mod packs +
   overrides, `build` → roots, cultures, structures). Imports the modules above, changes none.
+- `magicmaterials.py` standalone: magic material sets and materials for the website (`Texts` fills a
+  text link from its own replacements, `{TAG>ADD>Field}` from the DataStoreTag resource; references
+  are followed by id, as a renamed resource keeps its old name in links).
 - `template.html` the viewer; the report data is injected as JSON at `__DATA__`. Mod-report
   sections: Not merged, Tooltip keys, Possibly old content, Deleted, No target, Layout-only,
   Repeated, Overrides.
