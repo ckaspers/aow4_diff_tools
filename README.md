@@ -49,6 +49,7 @@ Other commands:
 | `python extract_schema.py --exe "<game>\ResourceED.exe"` | rebuild the schema by hand |
 | `python citytree.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | city tree links for an aow4db-style website (see below) |
 | `python magicmaterials.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | magic material sets, texts and income for the same website (see below) |
+| `python clbicons.py find PATTERN` / `list LIBRARY [PATTERN]` / `export LIBRARY NAME OUT.png [--crop]` / `export-all LIBRARY FOLDER [PATTERN]` | icons from the game's content libraries (see below) |
 
 Paths live in `config.json` (game folder, Mods folder, snapshots, reports, and `"site"` for
 `citytree.py` and `magicmaterials.py`).
@@ -122,6 +123,22 @@ enchantment. Texts are the game's or the mod's own, filled in with the values of
 shows them, so they follow game updates and the mod; the site's upstream `all.json` does neither.
 Concept links are written the way the site's `all.json` writes them, icons included. Run it after each
 dump, with the same `--site`, `--acp` and `--no-mod` as `citytree.py`.
+
+## Icons from the content libraries
+
+The game's DUMPALL exports only some icon folders. `clbicons.py` reads the rest straight from the
+game's content libraries (`.clb`, the files ContentEd opens) and saves them as PNG:
+
+    python clbicons.py find UmbralRamblings
+    python clbicons.py list Gameplay_Icons_EldritchRealms CombatEnchantment
+    python clbicons.py export Gameplay_Icons_EldritchRealms CombatEnchantment_UmbralRamblings umbral_ramblings.png --crop
+    python clbicons.py export-all Gameplay_Icons_EldritchRealms out CombatEnchantment --crop
+
+A library is a path or its name. An atlas that ContentEd shows (CombatEnchantments) is assembled from
+its images when the game loads; the library keeps each image separately, so export the images.
+`--crop` trims the transparent border, which gives the size of the hand-made icons on the website
+(218x248 for a combat enchantment). Icon images are 8-bit RGBA and export as is; other textures
+(block-compressed) are listed but skipped.
 
 ## Known limits
 

@@ -38,6 +38,15 @@ committed copy, so a rebuilt schema reaches it only once it is committed and pus
   A mod may hold a `.po` named after a game language (`EN.po`): a modder's own copy of the game's
   EN.MO for viewing and copying strings. The game does not load it and it goes stale after an
   update, so `tooltips.load_texts` skips any .po named after a game language folder.
+- **.clb** (content library, ContentEd; `clbicons.py`): `CRL\0`, header u32 [3] string table size,
+  [4] records size. Strings start at 0x20, records follow, the data area starts at the next 16-byte
+  boundary. A string is referenced as (u32 length, u32 offset from 0x20). A texture is a record with
+  byte (fid, off) pairs: 0x14 width, 0x15 height, 0x19 depth, 0x17 format, 0x18 flags, 0x16 data
+  (u32 offset in the data area, u32 storage 2 = LZ4 block / 0 = raw, u32 size, u32 stored size).
+  An image's own texture is nested after its name; its smaller copies follow as a list (class id
+  0x410024 before each). Icon images are format 83, 8-bit RGBA (all 6587 in the game's Icons
+  libraries); copies and other textures are block-compressed (191 is BC7 sRGB per ContentEd).
+  An atlas is assembled at load time; its only data of its own is a 1-bit mask.
 
 ## The schema (`extract_schema.py` → `schema_db.json`)
 
@@ -101,6 +110,8 @@ TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
 - `tooltips.py` tooltip key checks. `stale.py` dead links + "entries only your copy has".
 - `citytree.py` standalone: city tree links for the website (`Game` = game + mod packs +
   overrides, `build` → roots, cultures, structures). Imports the modules above, changes none.
+- `clbicons.py` standalone: list, find and export images of the game's `.clb` content libraries
+  (standard library only: its own LZ4 block decoder and PNG writer).
 - `magicmaterials.py` standalone: magic material sets and materials for the website (`Texts` fills a
   text link from its own replacements, `{TAG>ADD>Field}` from the DataStoreTag resource; references
   are followed by id, as a renamed resource keeps its old name in links).
