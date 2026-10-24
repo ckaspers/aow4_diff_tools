@@ -858,7 +858,7 @@ let mod = null, modRows = [], modRecs = new Set();
 const mine = () => st.modOnly && mod !== null;    // the sections follow the mod
 const MOD_GROUP_TEXT = {
   fix: ['Fix', 'rem', 'These overrides no longer reach the resource they were made on.'],
-  reapply: ['Re-apply', 'warn', 'The game changed these resources after your copy was made, and your copy still has the old values. Each lists everything the game changed, systemic changes included.'],
+  reapply: ['Re-apply', 'warn', 'The game changed these resources in this update. This page does not read the values in your copies, so a copy you already brought up to date is listed too: the mod report (aow4diff.py mod) compares your copies with the live game and marks only what still undoes a change. Each lists everything the game changed, systemic changes included.'],
   nothing: ['Nothing to do', 'add', ''],
   unchecked: ['Not checked', '', ''],
 };
@@ -866,7 +866,7 @@ const MOD_TEXT = {
   gone: ['Target removed', 'rem', 'The shipped resource is gone, so the override applies to nothing. Remove it, or move what it did somewhere else.'],
   recreated: ['Target re-created under a new id', 'rem', 'The game deleted the resource and made it again under another id. The override still points at the old one: make it again on the new one.'],
   moved: ['Target moved to another pack', 'rem', 'Same id, different pack: the override names the pack it used to be in. Make it again from the pack it is in now.'],
-  changed: ['Changed under you', 'warn', 'Your copy undoes these changes until you carry them into it (or re-make the override on the new version and re-apply your edits).'],
+  changed: ['Changed under you', 'warn', 'A copy made before this update undoes these changes until you carry them into it (or re-make the override on the new version and re-apply your edits).'],
   restamped: ['Only script node ids re-stamped', '', 'The script is identical; the game stamped new ids on its nodes. Those ids are bookkeeping the game does not read (re-minting them was tested in game), so your copy\'s old ones work as well.'],
   predates: ['Only empty fields added or dropped', '', 'The game re-saved this type with fields added or dropped, all of them empty. Your copy is in the old layout and reads those fields as empty too, so there is nothing to re-apply. If you had edited a field the game dropped, that edit no longer does anything.'],
   fresh: ['Target is new in this build', '', 'The resource first appears in the new build, so this override was made on it and cannot predate the update.'],
