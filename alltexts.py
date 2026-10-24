@@ -190,7 +190,10 @@ class Texts:
             link = f.get(n)
             mid = msgid(link) if link else None
             if mid and mid in self.T:
-                return self.fill(self.T[mid], dict(tooltips.links(link)[0][2]) if tooltips.links(link) else {}, mid)
+                found = tooltips.links(link)
+                # a key typed in with no value ("{GLOBAL.UnitConcept.Hyperlink}" = "") is filled as usual
+                vals = {k: v for k, v in found[0][2] if v not in (None, '')} if found else {}
+                return self.fill(self.T[mid], vals, mid)
         return None
 
     def concept(self, key, part):
@@ -364,6 +367,40 @@ def build_concepts(texts_of, old):
     return out, made
 
 
+DESCRIPTION_FIELDS = ('Screen Description', 'Description', 'Description String', 'Tooltip Description', 'Lore')
+
+
+def build_grouped(texts_of, texts, out, site):
+    """concept tooltips for the links to a property, unit, equipment... ([hyperlink,GLOBAL.PROPERTIES.BURNING]): the
+    resource with that DataStoreTag, its Screen Name and description. Left out where the site already shows the
+    ability of that name (Data/EN/Abilities.json, Data/GEN/ExtraToolTips.json), whose tooltip has its icon."""
+    abilities = set()
+    for path in (os.path.join(site, 'Data', 'EN', 'Abilities.json'), os.path.join(site, 'Data', 'GEN', 'ExtraToolTips.json')):
+        if os.path.exists(path):
+            for a in json.load(open(path, encoding='utf-8-sig')):
+                if isinstance(a, dict) and a.get('name'): abilities.add(a['name'].split('^')[0].strip().lower())
+    linked = set()
+    for e in texts:
+        for v in e.values():
+            if isinstance(v, str): linked.update(re.findall(r'\[hyperlink,(GLOBAL\.[A-Z_]+\.[A-Za-z0-9_]+)\]', v))
+    made = 0
+    for key in sorted(linked):
+        group, tag = key.split('.')[1:]
+        rid = next(iter(texts_of.tagged_all(tag)), None)
+        if not rid: continue
+        name = texts_of.link_text(rid, 'Screen Name', 'Name', 'Title String')
+        if not name: continue
+        name = plain_name(re.sub(r'<[^>]+>|\[/?hyperlink[^\]]*\]', '', name))
+        if not name or name.lower() in abilities: continue
+        description = texts_of.link_text(rid, *DESCRIPTION_FIELDS) or ''
+        description = site_markup(description).replace('\0', '<eventColor>{').replace('\1', '}</eventColor>')
+        description = re.sub(r'\[hyperlink,[^\]]*\](.*?)\[/hyperlink\]', r'<span style="">\1</span>', description)
+        if not description.strip(): continue
+        out[key] = {'name': name, 'icon': None, 'globalName': key, 'displayHtml': name, 'description': description}
+        made += 1
+    return made
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--site', help='the website\'s folder (default: "site" in config.json)')
@@ -387,8 +424,10 @@ def main():
               ', '.join('%s (%d)' % kv for kv in texts.unresolved.most_common(8)))
     cpath = os.path.join(site, 'Data', 'EN', 'concept_tooltips.json')
     old_concepts = json.load(open(cpath, encoding='utf-8-sig')) if os.path.exists(cpath) else {}
-    concepts, made = build_concepts(texts, old_concepts)
-    print('%d concepts: %d from the game, %d the game no longer has kept' % (len(concepts), made, len(concepts) - made))
+    concepts, made = build_concepts(texts, {k: v for k, v in old_concepts.items() if k.count('.') == 1})
+    grouped = build_grouped(texts, new, concepts, site)
+    print('%d concepts: %d from the game, %d the game no longer has kept, %d links to properties, units and the like'
+          % (len(concepts), made, len(concepts) - made - grouped, grouped))
     if args.dry_run: return new, concepts
     with open(path, 'w', encoding='utf-8', newline='\n') as f:
         json.dump(new, f, indent=2, ensure_ascii=False)
