@@ -4,7 +4,8 @@ sub-culture or tome it belongs to, read from the live game, with a mod on top if
     python citytree.py --site PATH [--out PATH] [--acp MOD.acp | --no-mod]
 
 Run it after copying a new DUMPALL dump into the website: it reads the site's
-Data/EN/StructureUpgrades.json and Data/EN/Tomes.json, and writes Data/GEN/CityTreeLinks.json.
+Data/EN/StructureUpgrades.json and Data/EN/Tomes.json, and writes Data/GEN/CityTreeLinks.json, and beside
+it StructurePredictions.json: the resids of every structure whose Show Prediction is off.
 The site folder is --site, else config.json's "site". The mod is --acp, else the first .acp in the
 Mods folder; --no-mod (or no mod installed) reads the game alone.
 
@@ -146,8 +147,6 @@ def build(game, site):
                   'side': names(f.get('RequiredSideProperties')),
                   'requisites': names(f.get('Requisites')),
                   'city_tier': value(f.get('IsCityTierUpgrade')) == 'true',
-                  # the tooltip shows the effects the game predicts unless Show Prediction is off
-                  'no_prediction': value(f.get('Show Prediction')) == 'false',
                   'tags': tags(f.get('Tags')), 'cultures': [], 'replaces': []}
 
     # ---- unlocks by player property (tome skills, sub-cultures) ----
@@ -324,12 +323,24 @@ def build(game, site):
     out = []
     for b in sorted(B.values(), key=lambda b: (b['section'], b['line'], b['th'] or 0, b['id'])):
         o = {k: b[k] for k in ('resid', 'section', 'line', 'th', 'parents')}
-        for k in ('cultures', 'replaces', 'variant', 'tome', 'no_prediction'):
+        for k in ('cultures', 'replaces', 'variant', 'tome'):
             if b.get(k): o[k] = b[k]
         out.append(o)
     roots = [{'key': k, 'name': r['name'], 'icon': r['icon']} for k, r in ROOTS.items()]
     return {'roots': roots, 'cultures': sorted(cultures.values(), key=lambda c: (c['parent'] or c['key'], c['parent'] is not None, c['key'])),
             'structures': out}, warn, B
+
+
+def hidden_predictions(game, site):
+    """resids of the structures whose Show Prediction is off: the game shows their description alone, without
+    the effects it predicts (Merchants' Guild). Every structure in the dump, sector upgrades too."""
+    dump = json.load(open(os.path.join(site, 'Data', 'EN', 'StructureUpgrades.json'), encoding='utf-8-sig'))
+    out = []
+    for e in dump:
+        rid = hexid(e['resid'])
+        if rid in game.raw and game.cls(rid) == 'TStructureUpgradeR'                 and value(fields(game.node(rid)).get('Show Prediction')) == 'false':
+            out.append(str(e['resid']))
+    return sorted(set(out), key=int)
 
 
 def main():
@@ -356,6 +367,13 @@ def main():
     print('  by section:', dict(Counter(s['section'] for s in data['structures'])))
     print('  city rows:', dict(Counter(s['line'] for s in data['structures'] if s['section'] == 'city')))
     for w in dict.fromkeys(warn): print('  warning:', w)
+
+    hidden = hidden_predictions(game, site)
+    pred = os.path.join(os.path.dirname(out), 'StructurePredictions.json')
+    with open(pred, 'w', encoding='utf-8', newline='\n') as f:
+        json.dump({k: data[k] for k in ('generated', 'build', 'mod')} | {'hidden': hidden}, f, indent=1, ensure_ascii=False)
+        f.write('\n')
+    print('%d structures with Show Prediction off -> %s' % (len(hidden), pred))
 
 
 if __name__ == '__main__':
