@@ -20,7 +20,7 @@ Texts are in the site's format: <bulletlist><bullet>, <icon></icon>, [hyperlink,
 """
 import argparse, datetime, json, os, re, sys
 
-import aow4diff, tooltips
+import aow4diff, alltexts, tooltips
 from citytree import Game, fields, refs, names, value, tags, msgid
 
 # TTokenSetBonus fields the decoder leaves out at their defaults (schema_db.json: FRequiredAmount 3,
@@ -119,14 +119,8 @@ class Texts:
 
 
 def site_markup(s):
-    """the game's markup as the dump writes it for the site"""
-    s = re.sub(r'<<m:(.*?)>>', r'\1', s)                      # plural forms: the text as is
-    s = s.replace('[br/]', '<br>')
-    # [bullet/] starts an item: close the one before it, and the last one with its list
-    s = s.replace('[bulletlist]', '<bulletlist>').replace('[/bulletlist]', '</bullet></bulletlist>')
-    s = s.replace('[bullet/]', '</bullet><bullet>').replace('<bulletlist></bullet>', '<bulletlist>')
-    s = re.sub(r'\[(\w+)/\]', r'<\1></\1>', s)                # icons: [xp/] -> <xp></xp>
-    return s.replace('\n', '<br>')
+    """the game's markup as the site writes it: the same as all.json's (alltexts.py)"""
+    return alltexts.site_markup(s)
 
 
 def income(game, rid):

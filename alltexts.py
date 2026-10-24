@@ -104,7 +104,15 @@ def site_markup(s):
     # a link's text starts at its first word (the game's Combat Casting Point link opens with a space)
     s = re.sub(r'(\[hyperlink,[^\]]*\])\s+', r'\1', s)
     # an icon before a link, spaced as everywhere else ("[minorcity/][hyperlink,...]Free City")
-    return re.sub(r'(<(\w+)></\2>)(\[hyperlink,)', r'\1 \3', s)
+    s = re.sub(r'(<(\w+)></\2>)(\[hyperlink,)', r'\1 \3', s)
+    # the game draws an icon with room around it, the site does not: "+2 <allegiance></allegiance> Allegiance",
+    # not "+2<allegiance></allegiance>Allegiance" (Void Stones)
+    s = re.sub(r'([0-9%])((?:\[hyperlink,[^\]]*\])?<(\w+)></\3>)',
+               lambda m: m.group(0) if m.group(3).lower() in NOT_ICONS else m.group(1) + ' ' + m.group(2), s)
+    return re.sub(r'(<(\w+)></\2>)(?=[A-Za-z])', lambda m: m.group(1) + ('' if m.group(2).lower() in NOT_ICONS else ' '), s)
+
+
+NOT_ICONS = {'br', 'bullet', 'bulletlist'}
 
 
 def plain_name(s):
