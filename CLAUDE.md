@@ -112,7 +112,9 @@ TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
   overrides, `build` → roots, cultures, structures). Imports the modules above, changes none.
 - `alltexts.py` standalone: the website's `Data/EN/all.json` from the live game with the mod (`Texts`: GLOBAL
   names from the tooltip libraries, typed values from the links that show a text, `{TAG>Field}` only when
-  one resource is meant). `update_site.bat` runs it, then `citytree.py` and `magicmaterials.py`.
+  one resource is meant). `update_site.bat` runs it, then `spawnsets.py`, `citytree.py` and `magicmaterials.py`.
+- `spawnsets.py` standalone: the website's `Data/GEN/all_spawnsets.json`, every `TUnitCategory` with its sets'
+  unit names (a set is a `TUnitSet` by SetName, or a unit by its DataStoreTag).
 - `clbicons.py` standalone: list, find and export images of the game's `.clb` content libraries
   (standard library only: its own LZ4 block decoder and PNG writer).
 - `magicmaterials.py` standalone: magic material sets and materials for the website (`Texts` fills a

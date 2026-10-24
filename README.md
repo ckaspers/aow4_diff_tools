@@ -35,8 +35,8 @@ python aow4diff.py after-update
 4. snapshots the live game into `snapshots/<build>` so the *next* update can be compared.
 
 For an aow4db-style website, once the patched game has made a new DUMPALL dump (with the mod loaded) and
-it is copied into the site: double-click `update_site.bat`. It runs `alltexts.py`, `citytree.py` and
-`magicmaterials.py` in that order (see below). It is a separate step because the dump only exists after the
+it is copied into the site: double-click `update_site.bat`. It runs `alltexts.py`, `spawnsets.py`, `citytree.py`
+and `magicmaterials.py` in that order (see below). It is a separate step because the dump only exists after the
 game has run.
 
 Steam updates the game in place, so the snapshot has to exist **before** an update arrives.
@@ -53,12 +53,13 @@ Other commands:
 | `python aow4diff.py dump "<resource name>" [--acp mod.acp]` | print how one resource decodes |
 | `python extract_schema.py --exe "<game>\ResourceED.exe"` | rebuild the schema by hand |
 | `python alltexts.py --site PATH [--acp mod.acp \| --no-mod] [--dry-run]` | all of the game's texts for an aow4db-style website (see below) |
+| `python spawnsets.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | unit categories (summon spells' spawn chances) for the same website (see below) |
 | `python citytree.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | city tree links for the same website (see below) |
 | `python magicmaterials.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | magic material sets, texts and income for the same website (see below) |
 | `python clbicons.py find PATTERN` / `list LIBRARY [PATTERN]` / `export LIBRARY NAME OUT.png [--crop]` / `export-all LIBRARY FOLDER [PATTERN]` | icons from the game's content libraries (see below) |
 
 Paths live in `config.json` (game folder, Mods folder, snapshots, reports, and `"site"` for
-`alltexts.py`, `citytree.py` and `magicmaterials.py`).
+`alltexts.py`, `spawnsets.py`, `citytree.py` and `magicmaterials.py`).
 
 ## Setup on Windows
 
@@ -128,6 +129,13 @@ it no longer has are kept, as pages may still look them up.
   written. Anything unfilled stays `<eventColor>{key}</eventColor>`, as the site shows placeholders.
 
 `--dry-run` reports what would change and writes nothing. It takes about a minute.
+
+## Unit categories for a website
+
+`spawnsets.py` writes the site's `Data/GEN/all_spawnsets.json`: every `TUnitCategory` (CategoryName, its
+Sets, repeats kept as they weigh the chances) with the names of each set's units. A category names a
+`TUnitSet` by its SetName or a unit by its DataStoreTag. Summon spells such as Call Greater Animal show
+their spawn chances from it, so they follow the mod: upstream's copy has the vanilla game's lists.
 
 ## City tree for a website
 
