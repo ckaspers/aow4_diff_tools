@@ -115,6 +115,24 @@ class Game:
         return [r for r in self.raw if self.cls(r) == cls]
 
 
+def income(game, rid):
+    """[[resource, value]] of an income property, values that are not 0"""
+    out = []
+    def walk(n):
+        if not n: return
+        if n[0] == 'o':
+            f = {l: v for (l, o, v) in n[2]}
+            if 'Resource' in f and 'Value' in f and value(f['Value']) not in (None, '0', '0.0'):
+                r = refs(f['Resource'])
+                res = game.name(r[0][1]) if r and r[0][1] in game.raw else (r[0][0] if r else value(f['Resource']))
+                out.append([res, int(float(value(f['Value'])))])
+            for (l, o, v) in n[2]: walk(v)
+        elif n[0] == 'l':
+            for x in n[1]: walk(x)
+    walk(game.node(rid))
+    return out
+
+
 def hexid(resid): return '%016X' % (int(resid) & 0xFFFFFFFFFFFFFFFF)
 
 
@@ -326,7 +344,22 @@ def build(game, site):
         for k in ('cultures', 'replaces', 'variant', 'tome'):
             if b.get(k): o[k] = b[k]
         out.append(o)
-    roots = [{'key': k, 'name': r['name'], 'icon': r['icon']} for k, r in ROOTS.items()]
+    # a root is a structure too ("Town Hall Tier 1 - Base City Level", "Throne City Upgrade"): its income, description and
+    # help text, which the dump leaves out for Town Hall I
+    by_name = {}
+    for rid in game.of_class('TStructureUpgradeR'):
+        f = fields(game.node(rid))
+        by_name.setdefault(msgid(f.get('Screen Name')), (rid, f))
+    roots = []
+    for k, r in ROOTS.items():
+        root = {'key': k, 'name': r['name'], 'icon': r['icon']}
+        if r['name'] in by_name:
+            rid, f = by_name[r['name']]
+            root['income'] = [x for p in ('Structure Properties', 'Colony Properties', 'Sector Properties')
+                              for n, i in refs(f.get(p)) if i in game.raw for x in income(game, i)]
+            for field, key in (('Screen Description', 'description'), ('Help Text', 'help')):
+                if msgid(f.get(field)): root[key] = msgid(f.get(field))
+        roots.append(root)
     return {'roots': roots, 'cultures': sorted(cultures.values(), key=lambda c: (c['parent'] or c['key'], c['parent'] is not None, c['key'])),
             'structures': out}, warn, B
 

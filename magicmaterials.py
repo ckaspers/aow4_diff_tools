@@ -21,7 +21,7 @@ Texts are in the site's format: <bulletlist><bullet>, <icon></icon>, [hyperlink,
 import argparse, datetime, json, os, re, sys
 
 import aow4diff, alltexts, tooltips
-from citytree import Game, fields, refs, names, value, tags, msgid
+from citytree import Game, fields, refs, names, value, tags, msgid, income
 
 # TTokenSetBonus fields the decoder leaves out at their defaults (schema_db.json: FRequiredAmount 3,
 # FRequiresUniqueTokens on)
@@ -121,24 +121,6 @@ class Texts:
 def site_markup(s):
     """the game's markup as the site writes it: the same as all.json's (alltexts.py)"""
     return alltexts.site_markup(s)
-
-
-def income(game, rid):
-    """[[resource, value]] of an income property, values that are not 0"""
-    out = []
-    def walk(n):
-        if not n: return
-        if n[0] == 'o':
-            f = {l: v for (l, o, v) in n[2]}
-            if 'Resource' in f and 'Value' in f and value(f['Value']) not in (None, '0', '0.0'):
-                r = refs(f['Resource'])
-                res = game.name(r[0][1]) if r and r[0][1] in game.raw else (r[0][0] if r else value(f['Resource']))
-                out.append([res, int(float(value(f['Value'])))])
-            for (l, o, v) in n[2]: walk(v)
-        elif n[0] == 'l':
-            for x in n[1]: walk(x)
-    walk(game.node(rid))
-    return out
 
 
 def build(game, texts, site):
