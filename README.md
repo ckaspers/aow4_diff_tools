@@ -34,6 +34,11 @@ python aow4diff.py after-update
 3. writes `reports/<mod>_vs_live_<build>.html` for every mod in your Mods folder,
 4. snapshots the live game into `snapshots/<build>` so the *next* update can be compared.
 
+For an aow4db-style website, once the patched game has made a new DUMPALL dump (with the mod loaded) and
+it is copied into the site: double-click `update_site.bat`. It runs `alltexts.py`, `citytree.py` and
+`magicmaterials.py` in that order (see below). It is a separate step because the dump only exists after the
+game has run.
+
 Steam updates the game in place, so the snapshot has to exist **before** an update arrives.
 A baseline snapshot of the current build is already in `snapshots/`. Each one is ~430 MB;
 delete old ones whenever you like.
@@ -47,12 +52,13 @@ Other commands:
 | `python aow4diff.py snapshot [--label NAME]` | snapshot only |
 | `python aow4diff.py dump "<resource name>" [--acp mod.acp]` | print how one resource decodes |
 | `python extract_schema.py --exe "<game>\ResourceED.exe"` | rebuild the schema by hand |
-| `python citytree.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | city tree links for an aow4db-style website (see below) |
+| `python alltexts.py --site PATH [--acp mod.acp \| --no-mod] [--dry-run]` | all of the game's texts for an aow4db-style website (see below) |
+| `python citytree.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | city tree links for the same website (see below) |
 | `python magicmaterials.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | magic material sets, texts and income for the same website (see below) |
 | `python clbicons.py find PATTERN` / `list LIBRARY [PATTERN]` / `export LIBRARY NAME OUT.png [--crop]` / `export-all LIBRARY FOLDER [PATTERN]` | icons from the game's content libraries (see below) |
 
 Paths live in `config.json` (game folder, Mods folder, snapshots, reports, and `"site"` for
-`citytree.py` and `magicmaterials.py`).
+`alltexts.py`, `citytree.py` and `magicmaterials.py`).
 
 ## Setup on Windows
 
@@ -103,6 +109,26 @@ Signs that an override is an old copy holding content the game has since removed
 
 Code: `stale.py`.
 
+## All texts for a website
+
+`alltexts.py` writes the site's `Data/EN/all.json`: every text of the game's EN.MO with the mod's `.po`
+on top, filled in with the values of the resources that show it, in the site's markup. A website that
+started from upstream's copy keeps its entries and order; texts the game added are appended, and texts
+it no longer has are kept, as pages may still look them up.
+
+- Concept links (`{GLOBAL.GoldConcept.Hyperlink}`) are the concept's own Hyperlink text; the names come
+  from the game's tooltip libraries (`TEDataStoreResource`, "Tooltip Global Library" and the like).
+  `{GLOBAL.PROPERTIES.TAG}`, `UNITS`, `STRUCTURE_UPGRADES`... are the resource with that DataStoreTag,
+  by its Screen Name.
+- Typed-in values come from the text links that show the text; where they differ, the values most of
+  them have. A text no resource shows keeps the site's wording.
+- `{TAG>Field}` is filled only when it is clear: one resource holds the tag, or one of those the text's
+  resources link to, and the field is written with a whole number. Several resources can share a tag
+  (three hold `STUNNED_EFFECT_DESCRIPTION`, one with 6 turns); a field left at its default is not
+  written. Anything unfilled stays `<eventColor>{key}</eventColor>`, as the site shows placeholders.
+
+`--dry-run` reports what would change and writes nothing. It takes about a minute.
+
 ## City tree for a website
 
 `citytree.py` writes `Data/GEN/CityTreeLinks.json` for an aow4db-style website: which city building
@@ -120,9 +146,9 @@ picks another, `--no-mod` reads the game alone.
 how many materials it needs (a field the decoder hides at its default of 3, different ones unless the
 set turns that off), and each material's name, global effect, lore, local income and combat
 enchantment. Texts are the game's or the mod's own, filled in with the values of the resource that
-shows them, so they follow game updates and the mod; the site's upstream `all.json` does neither.
-Concept links are written the way the site's `all.json` writes them, icons included. Run it after each
-dump, with the same `--site`, `--acp` and `--no-mod` as `citytree.py`.
+shows them, so they follow game updates and the mod. Concept links are written the way the site's
+`all.json` writes them, icons included, so run it after `alltexts.py`, with the same `--site`, `--acp` and
+`--no-mod` as `citytree.py`.
 
 ## Icons from the content libraries
 
