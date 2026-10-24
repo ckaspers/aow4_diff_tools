@@ -120,8 +120,8 @@ TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
   against the images' names; the reason is not known).
 - `realmtraits.py` standalone: the website's realm traits (`Data/GEN/RealmTraits.json`). The schema names the
   trait's fields though the decoder shows numbers: field_0 Name, 1 Description, 2 Icon, 6 Category (default 4
-  Misc), 12 Sub-Category; Entries = mutually exclusive. Icons are matched by image name: the GAMEPLAY_ICONS
-  atlas records with the ids are not read yet.
+  Misc), 12 Sub-Category; Entries = mutually exclusive. Icons by atlas and id (`atlas_names`:
+  name, fields table, body found by its values; id + 1); by image name where an atlas's records aren't found.
 - `clbicons.py` standalone: list, find and export images of the game's `.clb` content libraries
   (standard library only: its own LZ4 block decoder and PNG writer).
 - `magicmaterials.py` standalone: magic material sets and materials for the website (`Texts` fills a
