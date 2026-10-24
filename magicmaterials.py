@@ -99,7 +99,8 @@ class Texts:
             if g:
                 if g.group(1) in self.concepts: return self.concepts[g.group(1)]
                 self.warn.append('%s: the dump never links %s' % (mid, g.group(1)))
-                return '[hyperlink,%s]{%s}[/hyperlink]' % (g.group(1), g.group(1))
+                # braces the next round must not fill again; put back at the end
+                return '[hyperlink,%s]\0%s\1[/hyperlink]' % (g.group(1), g.group(1))
             if key.count('>') == 2:
                 v = self.stored(key)
                 if v is not None: return v
@@ -110,7 +111,7 @@ class Texts:
             filled = re.sub(r'\{[^{}<\[\]]+\}', fill, s)    # not "{<hp></hp>}": the site names that concept
             if filled == s: break
             s = filled
-        return site_markup(s)
+        return site_markup(s.replace('\0', '{').replace('\1', '}'))
 
     def name(self, link):
         """a name without the game's grammar marks ("Arcanium Ore^ns")"""
