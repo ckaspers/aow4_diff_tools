@@ -35,8 +35,8 @@ python aow4diff.py after-update
 4. snapshots the live game into `snapshots/<build>` so the *next* update can be compared.
 
 For an aow4db-style website, once the patched game has made a new DUMPALL dump (with the mod loaded) and
-it is copied into the site: double-click `update_site.bat`. It runs `alltexts.py`, `spawnsets.py`, `citytree.py`
-and `magicmaterials.py` in that order (see below). It is a separate step because the dump only exists after the
+it is copied into the site: double-click `update_site.bat`. It runs `alltexts.py`, `spawnsets.py`, `tmlicons.py`,
+`citytree.py` and `magicmaterials.py` in that order (see below). It is a separate step because the dump only exists after the
 game has run.
 
 Steam updates the game in place, so the snapshot has to exist **before** an update arrives.
@@ -140,6 +140,14 @@ tooltip inside a tooltip). Concepts the game no longer has are kept.
 Sets, repeats kept as they weigh the chances) with the names of each set's units. A category names a
 `TUnitSet` by its SetName or a unit by its DataStoreTag. Summon spells such as Call Greater Animal show
 their spawn chances from it, so they follow the mod: upstream's copy has the vanilla game's lists.
+
+## Text icons for a website
+
+`tmlicons.py` writes the game's text icons (`[casusbelli/]`, `[unitHero/]`, `[badRelation/]`...) to the site's
+`Icons/TML/<tag>.png`, and `Style/tmlicons.css` with a rule for each tag the site's own stylesheets don't style
+(and for a few misspelt tags the texts use, such as `bindingfragment`). Each `TGCNoesisTMLIconTag` names an atlas,
+`[<LIBRARY>]TXA\<n>`, and an image id in it; the atlases are BC7 textures in `TML_Icons.clb`, `Diplomacy_Icons.clb`
+and `UnitypeIcons.clb`, decoded by `bc7.py` (standard library only).
 
 ## City tree for a website
 

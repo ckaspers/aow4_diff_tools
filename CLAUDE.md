@@ -115,6 +115,9 @@ TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
   one resource is meant). `update_site.bat` runs it, then `spawnsets.py`, `citytree.py` and `magicmaterials.py`.
 - `spawnsets.py` standalone: the website's `Data/GEN/all_spawnsets.json`, every `TUnitCategory` with its sets'
   unit names (a set is a `TUnitSet` by SetName, or a unit by its DataStoreTag).
+- `tmlicons.py` standalone: the game's text icons for the website (`Icons/TML`, `Style/tmlicons.css`); `bc7.py`
+  decodes their BC7 atlases. A tag's image id is the atlas record's id + 2 in TML_ICONS, + 1 elsewhere (checked
+  against the images' names; the reason is not known).
 - `clbicons.py` standalone: list, find and export images of the game's `.clb` content libraries
   (standard library only: its own LZ4 block decoder and PNG writer).
 - `magicmaterials.py` standalone: magic material sets and materials for the website (`Texts` fills a

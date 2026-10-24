@@ -6,6 +6,7 @@ set PY=python
 where py >nul 2>nul && set PY=py -3
 %PY% alltexts.py || goto failed
 %PY% spawnsets.py || goto failed
+%PY% tmlicons.py || goto failed
 %PY% citytree.py || goto failed
 %PY% magicmaterials.py || goto failed
 echo.
