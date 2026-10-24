@@ -102,8 +102,44 @@ def style_tags(s):
                   r'<\1\2>', s)
 
 
+IRREGULAR = {'hero': 'heroes', 'thief': 'thieves', 'willthief': 'willthieves', 'fey': 'fey', 'undead': 'undead'}
+NO_PLURAL = '\2'    # left after a name the game marks ^ns or ^p, until the plural forms are made
+TITLES = {'Rally of the Lieges'}    # a name the game asks the plural of that has none
+
+
+def plural_word(w):
+    """the English plural of one word, keeping its capital ("City" -> "Cities", "hex" -> "hexes")"""
+    low = w.lower()
+    if low in IRREGULAR: p = IRREGULAR[low]
+    elif low.endswith('s'): return w                  # already plural ("Syrons", "Lieges")
+    elif re.search(r'[^aeiou]y$', low): p = low[:-1] + 'ies'
+    elif re.search(r'(x|z|ch|sh)$', low): p = low + 'es'
+    else: p = low + 's'
+    return w[0] + p[1:] if w[:1].isupper() else p
+
+
+def plural(phrase):
+    """the plural of a name or of a link's text: its last word, or the one before "of" ("Beacon of Unity" ->
+    "Beacons of Unity"). A name the game marks as plural or as not to be pluralized (^p, ^ns: "Astral Echoes",
+    "Arcanium Ore") stays as it is, as does a value left for play."""
+    def one(text):
+        if NO_PLURAL in text or re.search(r'\^\w*[ps]\b', text) or '\0' in text: return text
+        if text.strip() in TITLES: return text
+        if ' of ' in text: m = re.match(r'^(.*?)(\w+)( of .*)$', text)
+        else: m = re.match(r'^(.*?)(\w+)(\W*)$', text)
+        return m.group(1) + plural_word(m.group(2)) + m.group(3) if m else text
+    if '[hyperlink,' in phrase:
+        return re.sub(r'(\[hyperlink,[^\]]*\])(.*?)(\[/hyperlink\])', lambda m: m.group(1) + one(m.group(2)) + m.group(3),
+                      phrase, count=1)
+    return one(phrase)
+
+
 def site_markup(s):
-    s = re.sub(r'<<m:(.*?)>>', r'\1', s)       # plural forms: the text as is
+    # the game's own slip: "[hyperlink.RoutingConcept.HeroConcept]<<Routed>>[/hyperlink]" (Immortals)
+    s = re.sub(r'\[hyperlink\.(\w+)(?:\.\w+)*\]', r'[hyperlink,GLOBAL.\1]', s)
+    s = re.sub(r'<<m:(.*?)>>', lambda m: plural(m.group(1)), s)   # "<<m:{GLOBAL.CityConcept.Hyperlink}>>": Cities
+    s = re.sub(r'<<([^<>:]*)>>', r'\1', s)     # a plain form: "<<Routed>>"
+    s = s.replace(NO_PLURAL, '')
     s = re.sub(r'\^[A-Za-z]+', '', s)          # grammar marks: "Meds^z", "Arcanium Ore^ns"
     s = rebuild_lists(s.replace('[br/]', '<br>').replace('\n', '<br>'))
     s = s.replace('</bulletlist><br>', '</bulletlist>')    # a list already ends its line
@@ -234,8 +270,9 @@ class Texts:
         if name is None:
             self.unresolved['GLOBAL.%s.%s' % (group, tag)] += 1
             name = tag.replace('_', ' ').capitalize()
+        keep = NO_PLURAL if re.search(r'\^\w*[ps]\b', name) else ''    # "Arcanium Ore^ns" stays singular
         name = plain_name(name)
-        return name if part == 'Name' else '[hyperlink,GLOBAL.%s.%s]%s[/hyperlink]' % (group, tag, name)
+        return name if part == 'Name' else '[hyperlink,GLOBAL.%s.%s]%s%s[/hyperlink]' % (group, tag, name, keep)
 
     def stored(self, key, context=()):
         """{TAG>Field} or {TAG>AREA>Radius}: the field of the resource with that DataStoreTag, when it holds one
@@ -332,7 +369,9 @@ def build(texts_of, old):
         # a text no resource shows has no values to fill in: the one the site has keeps its numbers
         if mid in texts_of.unused and TYPED.search(texts_of.T[mid]) and field in e:
             # its wording stays; its lists and plural forms are written as the site's other texts
-            e[field] = style_tags(rebuild_lists(re.sub(r'<<m:(.*?)>>', r'\1', e[field])))
+            text = re.sub(r'\[hyperlink\.(\w+)(?:\.\w+)*\]', r'[hyperlink,GLOBAL.\1]', e[field])
+            text = re.sub(r'<<([^<>:]*)>>', r'\1', re.sub(r'<<m:(.*?)>>', lambda m: plural(m.group(1)), text))
+            e[field] = style_tags(rebuild_lists(text))
             kept += 1
             continue
         if id_.startswith('DLC@') and 'DLC' not in e: e['DLC'] = id_.split('@')[1]
