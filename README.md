@@ -140,6 +140,8 @@ tooltip inside a tooltip). Concepts the game no longer has are kept.
 Sets, repeats kept as they weigh the chances) with the names of each set's units. A category names a
 `TUnitSet` by its SetName or a unit by its DataStoreTag. Summon spells such as Call Greater Animal show
 their spawn chances from it, so they follow the mod: upstream's copy has the vanilla game's lists.
+It also writes `Data/GEN/all_spawnsets_strategic.json`, every `TUnitPool` (the units an event or a
+world-map spawner fields): its units by Screen Name, and the tag filters, unit upgrades and heroes it draws on.
 
 ## Text icons for a website
 
