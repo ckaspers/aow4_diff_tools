@@ -6,7 +6,8 @@ with a mod on top if one is given.
 Writes Data/GEN/RealmTraits.json, and the traits' icons to Icons/RealmTraits/<image>.png:
 
     categories  [{key, name, description}] in the game's order (Geography, Clime, Inhabitants, Presence, Misc)
-    traits      [{resid, name, description, category, subcategory, exclusive: [names], dlc, icon}]
+    traits      [{resid, name, complexity, description, category, subcategory, exclusive: [names], dlc, icon}]
+    exclusive_label  the game's "Mutually exclusive with:"
 
 A trait is a TPlayerEmpireWorldTraitR. The schema names its fields; the decoder shows them by number: field_0 Name,
 field_1 Description, field_2 Icon, field_6 Category (left out at its default, 4 Misc), field_12 Sub-Category, Entries
@@ -25,6 +26,8 @@ from citytree import Game, fields, refs, value
 CATEGORIES = [(0, 'GEOGRAPHY'), (1, 'CLIME'), (2, 'INHABITANTS'), (3, 'PRESENCE'), (4, 'MISC')]
 DEFAULT_CATEGORY = 4
 CLIME = 1
+# Complexity (field_14, left out at its default 1)
+COMPLEXITY = {0: 'SIMPLE_TRAIT', 1: 'NORMAL_TRAIT', 2: 'COMPLEX_TRAIT'}
 CAMPAIGN_ONLY = 5
 # traits that are no choice in the realm setup, by their editor name
 LEFT_OUT = re.compile(r'Story Realm|Campaign Version|Nature Mission|\bOLD\b')
@@ -176,9 +179,11 @@ def main():
         description = re.sub(r'<eventColor>\{([A-Z0-9_]+)\.(?:Hyperlink|Name)\}</eventColor>',
                              lambda m: '<span style="color:white">%s</span>' % leaders[m.group(1)] if m.group(1) in leaders else m.group(0),
                              text(rid, 'field_1'))
-        traits.append({'resid': str(int(rid, 16)), 'name': name, 'description': description,
+        complexity = value(f.get('field_14'))
+        complexity = T.T.get('REALM_TRAIT@TRAIT_COMPLEXITY@' + COMPLEXITY.get(int(complexity) if complexity else 1, 'NORMAL_TRAIT'), '')
+        traits.append({'resid': str(int(rid, 16)), 'name': name, 'complexity': complexity, 'description': description,
                        'category': cat, 'written': written, 'subcategory': (T.link_text(sub[0][1], 'Name') if sub and sub[0][1] in game.raw else None),
-                       'exclusive': sorted(set(e for e in exclusive if e and e != name)),
+                       'exclusive': list(dict.fromkeys(e for e in exclusive if e and e != name)),
                        'dlc': dlc.upper() if dlc not in ('Title', 'MOD') else None, 'icon': icon})
     # one trait can be in the game twice (Birds of Paradise: its houses, filed under Inhabitants, and its marauders,
     # with no category): keep the one whose category the game writes
@@ -186,11 +191,20 @@ def main():
     for t in sorted(traits, key=lambda t: (not t['written'], t['category'], t['subcategory'] or '', t['name'])):
         if t['name'] not in seen: seen.add(t['name']); unique.append(t)
     for t in unique: del t['written']
+    # the game shows an exclusion both ways (Ruined Realm: "No Free Cities", which lists it): own entries first
+    names = {t['name'] for t in unique}
+    for t in unique:
+        t['exclusive'] = [e for e in t['exclusive'] if e in names]
+    for t in unique:
+        for e in t['exclusive']:
+            other = next(o for o in unique if o['name'] == e)
+            if t['name'] not in other['exclusive']: other['exclusive'].append(t['name'])
     unique.sort(key=lambda t: (t['category'], t['subcategory'] or '', t['name']))
     categories = [{'key': c, 'name': T.T.get('REALM_TRAIT@CATEGORY@' + key, key.title()),
                    'description': T.T.get('REALM_TRAIT@CATEGORY@' + key + '_DESC', '')} for c, key in CATEGORIES]
     data = {'generated': __import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M'), 'build': aow4diff.build_label(cfg['game']),
-            'mod': os.path.splitext(os.path.basename(acp))[0] if acp else None, 'categories': categories, 'traits': unique}
+            'mod': os.path.splitext(os.path.basename(acp))[0] if acp else None, 'categories': categories,
+            'exclusive_label': T.T.get('REALM_TRAIT@TEXT@MUTUALLY_EXCLUSIVE', 'Mutually exclusive with:'), 'traits': unique}
     out = os.path.join(site, 'Data', 'GEN', 'RealmTraits.json')
     with open(out, 'w', encoding='utf-8', newline='\n') as f:
         json.dump(data, f, indent=1, ensure_ascii=False)

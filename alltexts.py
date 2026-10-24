@@ -149,6 +149,8 @@ def site_markup(s):
     s = re.sub(r'(\[hyperlink,[^\]]*\])\s+', r'\1', s)
     # an icon before a link, spaced as everywhere else ("[minorcity/][hyperlink,...]Free City")
     s = re.sub(r'(<(\w+)></\2>)(\[hyperlink,)', r'\1 \3', s)
+    # an icon the text puts before a link that brings the same one ("3 [turn/] {GLOBAL.TurnConcept.Hyperlink}")
+    s = re.sub(r'(<(\w+)></\2>)\s*(\[hyperlink,[^\]]*\])?\s*<\2></\2>', lambda m: m.group(1) + (' ' + m.group(3) if m.group(3) else ''), s)
     # the game draws an icon with room around it, the site does not: "+2 <allegiance></allegiance> Allegiance",
     # not "+2<allegiance></allegiance>Allegiance" (Void Stones)
     s = re.sub(r'([0-9%])((?:\[hyperlink,[^\]]*\])?<(\w+)></\3>)',
