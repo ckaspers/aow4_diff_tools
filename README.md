@@ -36,7 +36,7 @@ python aow4diff.py after-update
 
 For an aow4db-style website, once the patched game has made a new DUMPALL dump (with the mod loaded) and
 it is copied into the site: double-click `update_site.bat`. It runs `alltexts.py`, `spawnsets.py`, `tmlicons.py`,
-`citytree.py` and `magicmaterials.py` in that order (see below). It is a separate step because the dump only exists after the
+`realmtraits.py`, `citytree.py` and `magicmaterials.py` in that order (see below). It is a separate step because the dump only exists after the
 game has run.
 
 Steam updates the game in place, so the snapshot has to exist **before** an update arrives.
@@ -150,6 +150,13 @@ world-map spawner fields): its units by Screen Name, and the tag filters, unit u
 (and for a few misspelt tags the texts use, such as `bindingfragment`). Each `TGCNoesisTMLIconTag` names an atlas,
 `[<LIBRARY>]TXA\<n>`, and an image id in it; the atlases are BC7 textures in `TML_Icons.clb`, `Diplomacy_Icons.clb`
 and `UnitypeIcons.clb`, decoded by `bc7.py` (standard library only).
+
+## Realm traits for a website
+
+`realmtraits.py` writes `Data/GEN/RealmTraits.json`: every realm trait the setup offers
+(`TPlayerEmpireWorldTraitR`, not deprecated, not campaign-only) with its texts, category, subcategory, mutually
+exclusive traits and DLC, and its icon to `Icons/RealmTraits/` when the gameplay icon libraries have an image named
+after it.
 
 ## City tree for a website
 

@@ -94,13 +94,21 @@ def rebuild_lists(text):
     return ''.join(out).replace('<bullet></bullet>', '')
 
 
+def style_tags(s):
+    """the game's style tags as the site's: [helpcolor], [abilityblue]Rare[/abilityblue], [tooltipHeader]... (styled
+    in the site's style.css)"""
+    s = re.sub(r'\[(/?\w+color)\]', r'<\1>', s, flags=re.I)
+    return re.sub(r'\[(/?)(white|abilityblue|abilityred|fireCol|xpCol|runicfont|lorefont|lorefontsize|tooltipHeader)\]',
+                  r'<\1\2>', s)
+
+
 def site_markup(s):
     s = re.sub(r'<<m:(.*?)>>', r'\1', s)       # plural forms: the text as is
     s = re.sub(r'\^[A-Za-z]+', '', s)          # grammar marks: "Meds^z", "Arcanium Ore^ns"
     s = rebuild_lists(s.replace('[br/]', '<br>').replace('\n', '<br>'))
     s = s.replace('</bulletlist><br>', '</bulletlist>')    # a list already ends its line
     s = re.sub(r'\[(\w+)/\]', r'<\1></\1>', s)  # icons: [gold/] -> <gold></gold>
-    s = re.sub(r'\[(/?\w+color)\]', r'<\1>', s, flags=re.I)   # [helpcolor]...[/helpcolor], which the site styles
+    s = style_tags(s)
     # a link's text starts at its first word (the game's Combat Casting Point link opens with a space)
     s = re.sub(r'(\[hyperlink,[^\]]*\])\s+', r'\1', s)
     # an icon before a link, spaced as everywhere else ("[minorcity/][hyperlink,...]Free City")
@@ -324,7 +332,7 @@ def build(texts_of, old):
         # a text no resource shows has no values to fill in: the one the site has keeps its numbers
         if mid in texts_of.unused and TYPED.search(texts_of.T[mid]) and field in e:
             # its wording stays; its lists and plural forms are written as the site's other texts
-            e[field] = rebuild_lists(re.sub(r'<<m:(.*?)>>', r'\1', e[field]))
+            e[field] = style_tags(rebuild_lists(re.sub(r'<<m:(.*?)>>', r'\1', e[field])))
             kept += 1
             continue
         if id_.startswith('DLC@') and 'DLC' not in e: e['DLC'] = id_.split('@')[1]

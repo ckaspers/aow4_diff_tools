@@ -118,6 +118,10 @@ TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
 - `tmlicons.py` standalone: the game's text icons for the website (`Icons/TML`, `Style/tmlicons.css`); `bc7.py`
   decodes their BC7 atlases. A tag's image id is the atlas record's id + 2 in TML_ICONS, + 1 elsewhere (checked
   against the images' names; the reason is not known).
+- `realmtraits.py` standalone: the website's realm traits (`Data/GEN/RealmTraits.json`). The schema names the
+  trait's fields though the decoder shows numbers: field_0 Name, 1 Description, 2 Icon, 6 Category (default 4
+  Misc), 12 Sub-Category; Entries = mutually exclusive. Icons are matched by image name: the GAMEPLAY_ICONS
+  atlas records with the ids are not read yet.
 - `clbicons.py` standalone: list, find and export images of the game's `.clb` content libraries
   (standard library only: its own LZ4 block decoder and PNG writer).
 - `magicmaterials.py` standalone: magic material sets and materials for the website (`Texts` fills a
