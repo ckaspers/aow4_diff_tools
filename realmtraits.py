@@ -24,7 +24,36 @@ from citytree import Game, fields, refs, value
 
 CATEGORIES = [(0, 'GEOGRAPHY'), (1, 'CLIME'), (2, 'INHABITANTS'), (3, 'PRESENCE'), (4, 'MISC')]
 DEFAULT_CATEGORY = 4
+CLIME = 1
 CAMPAIGN_ONLY = 5
+# traits that are no choice in the realm setup, by their editor name
+LEFT_OUT = re.compile(r'Story Realm|Campaign Version|Nature Mission|\bOLD\b')
+
+
+def leader_names(game, T):
+    """{player alias: the lord's first name}: a Presence trait's leader entries name their alias and lord
+    ("DAWNWARDENS_ORDER_LEADER" -> Dragon Lord - Order Dragon Lord); the texts call them by it ("The Frost Queen
+    {ICE_QUEEN_LEADER.Hyperlink}"), and the game reads them "The Frost Queen Artica"."""
+    def first_name(rid):
+        found = []
+        def walk(n, inside=False):
+            if not n or found: return
+            if n[0] == 'o':
+                for l, o, v in n[2]:
+                    if inside and l == 'msgid' and value(v): found.append(value(v)); return
+                    walk(v, inside or l == 'FirstName')
+            elif n[0] == 'l':
+                for x in n[1]: walk(x, inside)
+        walk(game.node(rid))
+        return alltexts.plain_name(T.T.get(found[0], '')) if found else None
+    out = {}
+    for rid in game.of_class('TPlayerEmpireWorldTraitInhabitantsEntry'):
+        ps = fields(fields(game.node(rid)).get('PlayerSettings'))
+        alias, lord = value(ps.get('Alias')), refs(ps.get('Leader'))
+        if alias and lord and lord[0][1] in game.raw:
+            name = first_name(lord[0][1])
+            if name: out[alias] = name
+    return out
 
 
 def squash(s): return re.sub(r'[^a-z0-9]', '', s.lower())
@@ -113,16 +142,23 @@ def main():
         match = [n for n in images[lib][1] if n.startswith(('RealmTraits_', 'RealmIcon_')) and want and want in squash(n.split('_', 1)[1])]
         return (lib, min(match, key=len)) if match else None
 
+    leaders = leader_names(game, T)
+    all_traits = set(game.of_class('TPlayerEmpireWorldTraitR'))
+    # a bundle's parts (the Seven Sisters realm's three sets) are no choice of their own
+    parts = {i for r in all_traits for n, i in alltexts.all_refs(fields(game.node(r)).get('field_5')) if i in all_traits}
     traits = []
-    for rid in game.of_class('TPlayerEmpireWorldTraitR'):
+    for rid in all_traits:
         f = fields(game.node(rid))
-        if value(f.get('Is Deprecated')) == 'true': continue
+        if value(f.get('Is Deprecated')) == 'true' or rid in parts or LEFT_OUT.search(game.name(rid)): continue
         cat = value(f.get('field_6'))
-        cat = int(cat) if cat is not None else DEFAULT_CATEGORY
+        sub = refs(f.get('field_12'))
+        # left out at its default: a Misc trait has a subcategory, a Clime trait ("Desert Realm - Clime Realm Trait",
+        # "Frozen Realm - Environment Realm Trait") none
+        written = cat is not None
+        cat = int(cat) if written else (DEFAULT_CATEGORY if sub else CLIME)
         if cat == CAMPAIGN_ONLY: continue
         name = alltexts.plain_name(re.sub(r'<[^>]+>', '', text(rid, 'field_0')))
-        if not name: continue
-        sub = refs(f.get('field_12'))
+        if not name: continue    # the map sizes have none
         exclusive = [alltexts.plain_name(re.sub(r'<[^>]+>', '', text(i, 'field_0')))
                      for n, i in refs(f.get('Entries')) if i in game.raw]
         dlc = game.pack[rid].split('/')[0]
@@ -136,15 +172,21 @@ def main():
                 os.makedirs(os.path.dirname(out), exist_ok=True)
                 clbicons.write_png(out, tex['width'], tex['height'], library.pixels(tex))
             if not os.path.exists(out): icon = None
-        traits.append({'resid': str(int(rid, 16)), 'name': name, 'description': text(rid, 'field_1'),
-                       'category': cat, 'subcategory': (T.link_text(sub[0][1], 'Name') if sub and sub[0][1] in game.raw else None),
+        # a Presence trait's leaders: "The Frost Queen {ICE_QUEEN_LEADER.Hyperlink}" -> "The Frost Queen Artica"
+        description = re.sub(r'<eventColor>\{([A-Z0-9_]+)\.(?:Hyperlink|Name)\}</eventColor>',
+                             lambda m: '<span style="color:white">%s</span>' % leaders[m.group(1)] if m.group(1) in leaders else m.group(0),
+                             text(rid, 'field_1'))
+        traits.append({'resid': str(int(rid, 16)), 'name': name, 'description': description,
+                       'category': cat, 'written': written, 'subcategory': (T.link_text(sub[0][1], 'Name') if sub and sub[0][1] in game.raw else None),
                        'exclusive': sorted(set(e for e in exclusive if e and e != name)),
                        'dlc': dlc.upper() if dlc not in ('Title', 'MOD') else None, 'icon': icon})
-    # the same trait can be in the game twice (a DLC copy): keep the first of each name and description
+    # one trait can be in the game twice (Birds of Paradise: its houses, filed under Inhabitants, and its marauders,
+    # with no category): keep the one whose category the game writes
     seen, unique = set(), []
-    for t in sorted(traits, key=lambda t: (t['category'], t['subcategory'] or '', t['name'])):
-        k = (t['name'], t['description'])
-        if k not in seen: seen.add(k); unique.append(t)
+    for t in sorted(traits, key=lambda t: (not t['written'], t['category'], t['subcategory'] or '', t['name'])):
+        if t['name'] not in seen: seen.add(t['name']); unique.append(t)
+    for t in unique: del t['written']
+    unique.sort(key=lambda t: (t['category'], t['subcategory'] or '', t['name']))
     categories = [{'key': c, 'name': T.T.get('REALM_TRAIT@CATEGORY@' + key, key.title()),
                    'description': T.T.get('REALM_TRAIT@CATEGORY@' + key + '_DESC', '')} for c, key in CATEGORIES]
     data = {'generated': __import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M'), 'build': aow4diff.build_label(cfg['game']),
