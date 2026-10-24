@@ -146,6 +146,8 @@ def build(game, site):
                   'side': names(f.get('RequiredSideProperties')),
                   'requisites': names(f.get('Requisites')),
                   'city_tier': value(f.get('IsCityTierUpgrade')) == 'true',
+                  # the tooltip shows the effects the game predicts unless Show Prediction is off
+                  'no_prediction': value(f.get('Show Prediction')) == 'false',
                   'tags': tags(f.get('Tags')), 'cultures': [], 'replaces': []}
 
     # ---- unlocks by player property (tome skills, sub-cultures) ----
@@ -322,7 +324,7 @@ def build(game, site):
     out = []
     for b in sorted(B.values(), key=lambda b: (b['section'], b['line'], b['th'] or 0, b['id'])):
         o = {k: b[k] for k in ('resid', 'section', 'line', 'th', 'parents')}
-        for k in ('cultures', 'replaces', 'variant', 'tome'):
+        for k in ('cultures', 'replaces', 'variant', 'tome', 'no_prediction'):
             if b.get(k): o[k] = b[k]
         out.append(o)
     roots = [{'key': k, 'name': r['name'], 'icon': r['icon']} for k, r in ROOTS.items()]
