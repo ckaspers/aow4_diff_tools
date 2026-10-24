@@ -129,8 +129,8 @@ it no longer has are kept, as pages may still look them up.
   written. Anything unfilled stays `<eventColor>{key}</eventColor>`, as the site shows placeholders.
 
 It also writes `Data/EN/concept_tooltips.json`: every concept the libraries name, with its Title,
-icon, the wording of its Hyperlink and its Description (links in it as plain text, as the site shows no
-tooltip inside a tooltip). Concepts the game no longer has are kept.
+icon, the wording of its Hyperlink and its Description, links kept (with Selectable Tooltips on, the site opens
+a tooltip on top of a tooltip, as the game does). Concepts the game no longer has are kept.
 
 `--dry-run` reports what would change and writes nothing. It takes about a minute.
 

@@ -388,8 +388,8 @@ def build(texts_of, old):
 def build_concepts(texts_of, old):
     """concept_tooltips.json: {"GLOBAL.<key>": {name, icon, globalName, displayHtml, description}} for every concept
     the game's tooltip libraries name. name is the Title's text, icon its icon, displayHtml the wording inside the
-    concept's Hyperlink ("<hp></hp> Hit Point"), description its Description String with the links in it as plain
-    spans (the site shows no tooltip inside a tooltip). Concepts the game no longer has stay as they are."""
+    concept's Hyperlink ("<hp></hp> Hit Point"), description its Description String with its links (the site opens a
+    tooltip on top of the tooltip, as the game does). Concepts the game no longer has stay as they are."""
     out = dict(old)
     made = 0
     for key, (kind, rid) in sorted(texts_of.globals.items()):
@@ -409,7 +409,6 @@ def build_concepts(texts_of, old):
         inner = re.search(r'\[hyperlink,[^\]]*\](.*?)\[/hyperlink\]', link)
         if inner and inner.group(1).strip(): display = inner.group(1).strip()
         description = texts_of(desc_mid) if desc_mid and desc_mid in texts_of.T else ''
-        description = re.sub(r'\[hyperlink,[^\]]*\](.*?)\[/hyperlink\]', r'<span style="">\1</span>', description)
         out['GLOBAL.' + key] = {'name': name, 'icon': icon or None, 'globalName': 'GLOBAL.' + key,
                                 'displayHtml': display, 'description': description}
         made += 1
@@ -443,7 +442,6 @@ def build_grouped(texts_of, texts, out, site):
         if not name or name.lower() in abilities: continue
         description = texts_of.link_text(rid, *DESCRIPTION_FIELDS) or ''
         description = site_markup(description).replace('\0', '<eventColor>{').replace('\1', '}</eventColor>')
-        description = re.sub(r'\[hyperlink,[^\]]*\](.*?)\[/hyperlink\]', r'<span style="">\1</span>', description)
         if not description.strip(): continue
         out[key] = {'name': name, 'icon': None, 'globalName': key, 'displayHtml': name, 'description': description}
         made += 1
