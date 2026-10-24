@@ -1,5 +1,5 @@
-"""All of the game's texts for an aow4db-style website (Data/EN/all.json), read from the live game with a mod on top
-if one is given: every text the game's or the mod's own, filled in with the values of the resources that show it.
+"""All of the game's texts for an aow4db-style website (Data/EN/all.json, and the concept tooltips in
+Data/EN/concept_tooltips.json), read from the live game with a mod on top if one is given: every text the game's or the mod's own, filled in with the values of the resources that show it.
 
     python alltexts.py --site PATH [--acp MOD.acp | --no-mod] [--dry-run]
 
@@ -333,6 +333,37 @@ def build(texts_of, old):
                                          'kept (no resource shows them)': kept}
 
 
+def build_concepts(texts_of, old):
+    """concept_tooltips.json: {"GLOBAL.<key>": {name, icon, globalName, displayHtml, description}} for every concept
+    the game's tooltip libraries name. name is the Title's text, icon its icon, displayHtml the wording inside the
+    concept's Hyperlink ("<hp></hp> Hit Point"), description its Description String with the links in it as plain
+    spans (the site shows no tooltip inside a tooltip). Concepts the game no longer has stay as they are."""
+    out = dict(old)
+    made = 0
+    for key, (kind, rid) in sorted(texts_of.globals.items()):
+        if kind != 'res' or texts_of.game.cls(rid) != CONCEPT: continue
+        f = fields(texts_of.game.node(rid))
+        mid = lambda n: msgid(f.get(n)) if f.get(n) else None
+        title_mid, desc_mid, link_mid = mid('Title String'), mid('Description String'), mid('Hyperlink')
+        if not title_mid or title_mid not in texts_of.T: continue
+        title = texts_of(title_mid)
+        name = re.sub(r'\s+', ' ', re.sub(r'<[^>]+>|\[/?hyperlink[^\]]*\]', '', title)).strip()
+        if not name: continue
+        link = texts_of(link_mid) if link_mid and link_mid in texts_of.T else ''
+        # the icon: the Title's, else the Hyperlink's, else the one the site had ("personalityAstral02")
+        icon = re.search(r'<(\w+)></\1>', title) or re.search(r'<(\w+)></\1>', link)
+        icon = icon.group(1) if icon else (old.get('GLOBAL.' + key) or {}).get('icon')
+        display = name
+        inner = re.search(r'\[hyperlink,[^\]]*\](.*?)\[/hyperlink\]', link)
+        if inner and inner.group(1).strip(): display = inner.group(1).strip()
+        description = texts_of(desc_mid) if desc_mid and desc_mid in texts_of.T else ''
+        description = re.sub(r'\[hyperlink,[^\]]*\](.*?)\[/hyperlink\]', r'<span style="">\1</span>', description)
+        out['GLOBAL.' + key] = {'name': name, 'icon': icon or None, 'globalName': 'GLOBAL.' + key,
+                                'displayHtml': display, 'description': description}
+        made += 1
+    return out, made
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--site', help='the website\'s folder (default: "site" in config.json)')
@@ -354,10 +385,17 @@ def main():
     if texts.unresolved:
         print('  %d GLOBAL names the game\'s libraries lack, the most used:' % len(texts.unresolved),
               ', '.join('%s (%d)' % kv for kv in texts.unresolved.most_common(8)))
-    if args.dry_run: return new
+    cpath = os.path.join(site, 'Data', 'EN', 'concept_tooltips.json')
+    old_concepts = json.load(open(cpath, encoding='utf-8-sig')) if os.path.exists(cpath) else {}
+    concepts, made = build_concepts(texts, old_concepts)
+    print('%d concepts: %d from the game, %d the game no longer has kept' % (len(concepts), made, len(concepts) - made))
+    if args.dry_run: return new, concepts
     with open(path, 'w', encoding='utf-8', newline='\n') as f:
         json.dump(new, f, indent=2, ensure_ascii=False)
     print('->', path)
+    with open(cpath, 'w', encoding='utf-8', newline='\n') as f:
+        json.dump(concepts, f, indent=2, ensure_ascii=False)
+    print('->', cpath)
 
 
 if __name__ == '__main__':

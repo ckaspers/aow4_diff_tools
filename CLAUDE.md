@@ -110,7 +110,7 @@ TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
 - `tooltips.py` tooltip key checks. `stale.py` dead links + "entries only your copy has".
 - `citytree.py` standalone: city tree links for the website (`Game` = game + mod packs +
   overrides, `build` → roots, cultures, structures). Imports the modules above, changes none.
-- `alltexts.py` standalone: the website's `Data/EN/all.json` from the live game with the mod (`Texts`: GLOBAL
+- `alltexts.py` standalone: the website's `Data/EN/all.json` and `concept_tooltips.json` from the live game with the mod (`Texts`: GLOBAL
   names from the tooltip libraries, typed values from the links that show a text, `{TAG>Field}` only when
   one resource is meant). `update_site.bat` runs it, then `spawnsets.py`, `citytree.py` and `magicmaterials.py`.
 - `spawnsets.py` standalone: the website's `Data/GEN/all_spawnsets.json`, every `TUnitCategory` with its sets'
