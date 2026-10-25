@@ -5,7 +5,8 @@ sub-culture or tome it belongs to, read from the live game, with a mod on top if
 
 Run it after copying a new DUMPALL dump into the website: it reads the site's
 Data/EN/StructureUpgrades.json and Data/EN/Tomes.json, and writes Data/GEN/CityTreeLinks.json, and beside
-it StructurePredictions.json: the resids of every structure whose Show Prediction is off, and each one's Help Text.
+it StructurePredictions.json: the resids of every structure whose Show Prediction is off, each one's Help Text, and the
+units each province improvement unlocks.
 The site folder is --site, else config.json's "site". The mod is --acp, else the first .acp in the
 Mods folder; --no-mod (or no mod installed) reads the game alone.
 
@@ -368,16 +369,29 @@ def structure_extras(game, site):
     """what the dump leaves out of every structure (sector upgrades too):
     hidden  resids of those whose Show Prediction is off: the game shows their description alone, without the
             effects it predicts (Merchants' Guild)
-    help    {resid: msgid} of their Help Text, the yellow line at the foot of the tooltip ("Use mana to cast Spells")"""
+    help    {resid: msgid} of their Help Text, the yellow line at the foot of the tooltip ("Use mana to cast Spells")
+    units   {resid: [unit ids]} of the province improvements that unlock units, by tier: a unit's Required Structure
+            Properties names properties these improvements grant in their Colony Properties (Clay Forge grants
+            "Clay Arbalest - Structure Property"); a unit needs any one of them"""
     dump = json.load(open(os.path.join(site, 'Data', 'EN', 'StructureUpgrades.json'), encoding='utf-8-sig'))
-    hidden, help_texts = set(), {}
+    unit_of = {hexid(u['resid']): u for u in json.load(open(os.path.join(site, 'Data', 'EN', 'Units.json'), encoding='utf-8-sig'))}
+    needed_by = {}
+    for r in game.of_class('TBaseUnitR'):
+        if r not in unit_of: continue
+        for n, i in refs(fields(game.node(r)).get('Required Structure Properties')): needed_by.setdefault(i, []).append(unit_of[r])
+    hidden, help_texts, unlocks = set(), {}, {}
     for e in dump:
         rid = hexid(e['resid'])
         if rid not in game.raw or game.cls(rid) != 'TStructureUpgradeR': continue
         f = fields(game.node(rid))
         if value(f.get('Show Prediction')) == 'false': hidden.add(str(e['resid']))
         if msgid(f.get('Help Text')): help_texts[str(e['resid'])] = msgid(f.get('Help Text'))
-    return sorted(hidden, key=int), dict(sorted(help_texts.items(), key=lambda x: int(x[0])))
+        if value(f.get('IsSectorImprovement')) == 'true':
+            us = {u['id']: u for n, i in refs(f.get('Colony Properties')) + refs(f.get('Structure Properties'))
+                  for u in needed_by.get(i, [])}
+            if us: unlocks[str(e['resid'])] = [u['id'] for u in sorted(us.values(), key=lambda u: int(u['tier']))]
+    return (sorted(hidden, key=int), dict(sorted(help_texts.items(), key=lambda x: int(x[0]))),
+            dict(sorted(unlocks.items(), key=lambda x: int(x[0]))))
 
 
 def main():
@@ -405,13 +419,14 @@ def main():
     print('  city rows:', dict(Counter(s['line'] for s in data['structures'] if s['section'] == 'city')))
     for w in dict.fromkeys(warn): print('  warning:', w)
 
-    hidden, help_texts = structure_extras(game, site)
+    hidden, help_texts, unlocks = structure_extras(game, site)
     pred = os.path.join(os.path.dirname(out), 'StructurePredictions.json')
     with open(pred, 'w', encoding='utf-8', newline='\n') as f:
-        json.dump({k: data[k] for k in ('generated', 'build', 'mod')} | {'hidden': hidden, 'help': help_texts},
+        json.dump({k: data[k] for k in ('generated', 'build', 'mod')} | {'hidden': hidden, 'help': help_texts, 'units': unlocks},
                   f, indent=1, ensure_ascii=False)
         f.write('\n')
-    print('%d structures with Show Prediction off, %d with a help text -> %s' % (len(hidden), len(help_texts), pred))
+    print('%d structures with Show Prediction off, %d with a help text, %d province improvements that unlock units -> %s'
+          % (len(hidden), len(help_texts), len(unlocks), pred))
 
 
 if __name__ == '__main__':
