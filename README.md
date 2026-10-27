@@ -123,10 +123,13 @@ it no longer has are kept, as pages may still look them up.
   by its Screen Name.
 - Typed-in values come from the text links that show the text; where they differ, the values most of
   them have. A text no resource shows keeps the site's wording.
-- `{TAG>Field}` is filled only when it is clear: one resource holds the tag, or one of those the text's
-  resources link to, and the field is written with a whole number. Several resources can share a tag
-  (three hold `STUNNED_EFFECT_DESCRIPTION`, one with 6 turns); a field left at its default is not
-  written. Anything unfilled stays `<eventColor>{key}</eventColor>`, as the site shows placeholders.
+- `{TAG>Field}` is filled only when it is clear: one resource holds the tag, one of those the text's
+  resources link to, or all of them give the same value, and the field is a whole number. Several
+  resources can share a tag (three hold `STUNNED_EFFECT_DESCRIPTION`, one with 6 turns). A field left
+  at its default is not written: its default comes from the schema (`Num Turns` 1). A few fields go by
+  another name in the editor: `ResolvedStrength` is a resistance check's Strength × 10 (9 is a base
+  90% chance), an area's `Radius` its Added radius. Anything unfilled stays
+  `<eventColor>{key}</eventColor>`, as the site shows placeholders.
 
 It also writes `Data/EN/concept_tooltips.json`: every concept the libraries name, with its Title,
 icon, the wording of its Hyperlink and its Description, links kept (with Selectable Tooltips on, the site opens

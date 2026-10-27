@@ -14,8 +14,9 @@ How a text is written for the site:
     {GLOBAL.PROPERTIES.TAG.Hyperlink} (UNITS, ...)   [hyperlink,GLOBAL.PROPERTIES.TAG]<the Screen Name of the resource tagged TAG>[/hyperlink]
     {LOC.MSGID}                                      that text
     {key}                                            the value typed into the text link, else <eventColor>{key}</eventColor>
-    {TAG>Field}, {TAG>AREA>Radius}                   the field of the resource with that DataStoreTag when it holds one
-                                                     clear whole number, else <eventColor>{TAG>Field}</eventColor>
+    {TAG>Field}, {TAG>AREA>Radius}                   the field of the resource with that DataStoreTag (or its default) when
+                                                     it holds one clear whole number, else <eventColor>{TAG>Field}</eventColor>
+                                                     (ResolvedStrength: Strength x 10, Radius: Added radius)
     [bulletlist][bullet/]...[/bulletlist]           <bulletlist><bullet>...</bullet></bulletlist>, nested lists inside their bullet
     [br/] [gold/] <<m:text>>                         <br> <gold></gold> text
 The GLOBAL names are the keys of the game's tooltip libraries (TEDataStoreResource: "Tooltip Global Library", ...).
@@ -23,7 +24,7 @@ A text several resources show with different values takes the values most of the
 """
 import argparse, collections, json, os, re, sys
 
-import aow4diff, tooltips
+import aow4diff, decode, tooltips
 from citytree import Game, fields, refs, value, msgid
 
 CONCEPT = 'TDefaultGameConceptDescriptionResource'
@@ -31,6 +32,9 @@ CONCEPT = 'TDefaultGameConceptDescriptionResource'
 TYPED = re.compile(r'\{(?!GLOBAL\.|LOC\.)[^{}<>\[\]]+\}')
 KEY = re.compile(r'\{[^{}<\[\]]+\}')    # not "{<hp></hp>}": the site names that concept itself
 TOKEN = re.compile(rb'[A-Za-z0-9_@]{3,}')
+# a data store path's field names the editor names otherwise, with the factor the game shows them by:
+# a resistance check's Strength 9 is a base 90% chance, a line's or circle's Added radius its Radius
+STORED_AS = {'resolvedstrength': ('strength', 10), 'radius': ('addedradius', 1)}
 def needs_resource(s):
     """whether a text has values only the resources showing it can give: typed-in ones, or a data store path
     whose tag several resources share"""
@@ -180,6 +184,7 @@ class Texts:
             for tok in set(TOKEN.findall(raw)) & want: self.where[tok.decode()].append(rid)
         self.globals = self._libraries()
         self._users, self._tagged, self._done, self._concepts, self._linked, self._shown_by = {}, {}, {}, {}, {}, {}
+        self._defaults = {}
         self.unused = set()    # texts with values to type in that no resource shows
 
     # ---- what the GLOBAL names stand for ----
@@ -276,21 +281,56 @@ class Texts:
         name = plain_name(name)
         return name if part == 'Name' else '[hyperlink,GLOBAL.%s.%s]%s%s[/hyperlink]' % (group, tag, name, keep)
 
+    def defaults(self, cls):
+        """{field label without spaces, lower case: value} of a class's whole-number fields, as the game reads the
+        ones a resource leaves out (the serializer skips defaults: Pacified's Num Turns, 1)"""
+        if cls not in self._defaults:
+            S, out = self.game.S, {}
+            cid = S.by_name.get(cls)
+            for c in S.chain(cid) if cid else ():
+                for f in S.cls[c]['f'].values():
+                    d = S.display(c, f[2]) if f[2] is not None else None
+                    if d and f[1] in decode.INT_SLOTS:
+                        out.setdefault(d[0].replace(' ', '').lower(), self.game.D.default_text(f, 4))
+            self._defaults[cls] = out
+        return self._defaults[cls]
+
     def stored(self, key, context=()):
         """{TAG>Field} or {TAG>AREA>Radius}: the field of the resource with that DataStoreTag, when it holds one
-        clear whole number (ResolvedStrength and the like are worked out in play)"""
-        parts = key.strip('{}').split('>')
-        tag, hints, field = parts[0], [p.lower() for p in parts[1:-1]], parts[-1].replace(' ', '').lower()
+        clear whole number. Several resources sharing the tag do when they agree (Infernal Blaze's two)."""
+        tag = key.strip('{}').split('>')[0]
         rid = self.tagged(tag, context)
-        if not rid: return None
+        if rid: return self.stored_in(rid, key)
+        vals = {self.stored_in(r, key) for r in self.tagged_all(tag)}
+        return vals.pop() if len(vals) == 1 else None
+
+    def stored_in(self, rid, key):
+        parts = key.strip('{}').split('>')
+        hints, field = [p.lower() for p in parts[1:-1]], parts[-1].replace(' ', '').lower()
+        v = self.field_value(rid, hints, field)
+        if v is None and field in STORED_AS:
+            field, factor = STORED_AS[field]
+            v = self.field_value(rid, hints, field)
+            if v is not None: v = str(int(v) * factor)
+        return v
+
+    def field_value(self, rid, hints, field):
         found = []
         def walk(n, path):
             if not n: return
             if n[0] == 'o':
+                have = set()
                 for (l, o, v) in n[2]:
                     p = path + '/' + l.lower()
+                    have.add(l.replace(' ', '').lower())
                     if l.replace(' ', '').lower() == field and v and v[0] == 'v': found.append((p, value(v)))
                     walk(v, p)
+                if field not in have:
+                    d = self.defaults(n[1]).get(field)
+                    # a circle area, a class the schema does not name: its first field is the radius, 1 if left out
+                    if d is None and n[1] is None and field == 'addedradius' and path.endswith('/area'):
+                        d = value(dict((l, v) for l, o, v in n[2]).get('field_1')) or '1'
+                    if d is not None: found.append((path + '/' + field, d))
             elif n[0] == 'l':
                 for x in n[1]: walk(x, path)
         walk(self.game.node(rid), '')
