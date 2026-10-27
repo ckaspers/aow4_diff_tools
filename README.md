@@ -35,7 +35,7 @@ python aow4diff.py after-update
 4. snapshots the live game into `snapshots/<build>` so the *next* update can be compared.
 
 For an aow4db-style website, once the patched game has made a new DUMPALL dump (with the mod loaded) and
-it is copied into the site: double-click `update_site.bat`. It runs `alltexts.py`, `spawnsets.py`, `tmlicons.py`,
+it is copied into the site: double-click `update_site.bat`. It runs `abilities.py`, `alltexts.py`, `spawnsets.py`, `tmlicons.py`,
 `realmtraits.py`, `citytree.py` and `magicmaterials.py` in that order (see below). It is a separate step because the dump only exists after the
 game has run.
 
@@ -160,6 +160,15 @@ and `UnitypeIcons.clb`, decoded by `bc7.py` (standard library only).
 (`TPlayerEmpireWorldTraitR`, not deprecated, not campaign-only) with its texts, category, subcategory, mutually
 exclusive traits and DLC, and its icon to `Icons/RealmTraits/` when the gameplay icon libraries have an image named
 after it.
+
+## Linked abilities for a website
+
+`abilities.py` writes `Data/GEN/LinkedAbilities.json`: the unit abilities (`TAbilityProperty`) the game's texts link
+to (`{GLOBAL.PROPERTIES.<tag>}`) that the DUMPALL dump leaves out, because no unit has them from the start (Paragon of
+Strife's Infernal Blaze). Each is written as `Data/EN/Abilities.json` has it (damage, accuracy, range, actions,
+requisites, notes, icon), and its icon goes to `Icons/UnitIcons/`. Damage is the ability's own: the dump's includes
+the unit's bonuses (Astra's Divine Sundering: Mythic +10%, Zeal +4). `--check` compares every other field with the
+dump's abilities of the same name. Run it before `alltexts.py`, which then writes no concept tooltip for them.
 
 ## City tree for a website
 

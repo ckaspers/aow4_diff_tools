@@ -118,6 +118,11 @@ TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
 - `tmlicons.py` standalone: the game's text icons for the website (`Icons/TML`, `Style/tmlicons.css`); `bc7.py`
   decodes their BC7 atlases. A tag's image id is the atlas record's id + 2 in TML_ICONS, + 1 elsewhere (checked
   against the images' names; the reason is not known).
+- `abilities.py` standalone: the abilities the game's texts link to that the dump leaves out
+  (`Data/GEN/LinkedAbilities.json`), in Abilities.json's format. Worked out against the dump (`--check`): AbilityType
+  0-5 = repeating, single use, full, full continue, free, leave one; a Can't Miss or missing accuracy setting is Always
+  Hits; Accuracy left out is 0.9; Line of Sight notes only for abilities that can miss; once per battle hides the
+  cooldown; AllowZeroCooldowns shows "Cooldown: 0"; Starting Cooldown shows its turns only when they differ.
 - `realmtraits.py` standalone: the website's realm traits (`Data/GEN/RealmTraits.json`). The schema names the
   trait's fields though the decoder shows numbers: field_0 Name, 1 Description, 2 Icon, 6 Category (default 4
   Misc), 12 Sub-Category; Entries = mutually exclusive. Icons by atlas and id (`atlas_names`:

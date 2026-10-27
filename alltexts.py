@@ -461,9 +461,11 @@ DESCRIPTION_FIELDS = ('Screen Description', 'Description', 'Description String',
 def build_grouped(texts_of, texts, out, site):
     """concept tooltips for the links to a property, unit, equipment... ([hyperlink,GLOBAL.PROPERTIES.BURNING]): the
     resource with that DataStoreTag, its Screen Name and description. Left out where the site already shows the
-    ability of that name (Data/EN/Abilities.json, Data/GEN/ExtraToolTips.json), whose tooltip has its icon."""
+    ability of that name (Data/EN/Abilities.json, Data/GEN/ExtraToolTips.json, and LinkedAbilities.json, which
+    abilities.py writes before), whose tooltip has its icon."""
     abilities = set()
-    for path in (os.path.join(site, 'Data', 'EN', 'Abilities.json'), os.path.join(site, 'Data', 'GEN', 'ExtraToolTips.json')):
+    for path in (os.path.join(site, 'Data', 'EN', 'Abilities.json'), os.path.join(site, 'Data', 'GEN', 'ExtraToolTips.json'),
+                 os.path.join(site, 'Data', 'GEN', 'LinkedAbilities.json')):
         if os.path.exists(path):
             for a in json.load(open(path, encoding='utf-8-sig')):
                 if isinstance(a, dict) and a.get('name'): abilities.add(a['name'].split('^')[0].strip().lower())
