@@ -121,6 +121,11 @@ it no longer has are kept, as pages may still look them up.
   from the game's tooltip libraries (`TEDataStoreResource`, "Tooltip Global Library" and the like).
   `{GLOBAL.PROPERTIES.TAG}`, `UNITS`, `STRUCTURE_UPGRADES`... are the resource with that DataStoreTag,
   by its Screen Name.
+- Plurals: the game writes `<<m:...>>` for a plural whatever the number, and one form after a typed-in
+  number. A word the game ever asks the plural of (Turn, Hit Point, Unit, City...) takes the form of the
+  number before it: "for 1 Turn", "every 2 Turns", "dispel 1 Negative Status Effect". Not after a tier
+  ("Tier 1 Units"), nor when it describes the noun after it ("a 3 Turn cooldown", "3 Tentacle units").
+  Gold, Fire Damage and the like are never counted.
 - Typed-in values come from the text links that show the text; where they differ, the values most of
   them have. A text no resource shows keeps the site's wording.
 - `{TAG>Field}` is filled only when it is clear: one resource holds the tag, the nearest of those the
@@ -135,7 +140,10 @@ it no longer has are kept, as pages may still look them up.
 
 It also writes `Data/EN/concept_tooltips.json`: every concept the libraries name, with its Title,
 icon, the wording of its Hyperlink and its Description, links kept (with Selectable Tooltips on, the site opens
-a tooltip on top of a tooltip, as the game does). Concepts the game no longer has are kept.
+a tooltip on top of a tooltip, as the game does). Concepts the game no longer has are kept. A link to a
+property, structure, special operation... gets the resource's Screen Name and description, and its icon as
+`image` (the icon resource's id), exported to `Icons/UnitIcons/<id>.png` as `abilities.py` exports an
+ability's: 346 of the 424 have one (a unit's icon is drawn from its model).
 
 `--dry-run` reports what would change and writes nothing. It takes about a minute.
 

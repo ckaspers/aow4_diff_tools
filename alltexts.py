@@ -17,7 +17,9 @@ How a text is written for the site:
                                                      it holds one clear whole number, else <eventColor>{TAG>Field}</eventColor>
                                                      (ResolvedStrength: Strength x 10, Radius: Added radius)
     [bulletlist][bullet/]...[/bulletlist]           <bulletlist><bullet>...</bullet></bulletlist>, nested lists inside their bullet
-    [br/] [gold/] <<m:text>>                         <br> <gold></gold> text
+    [br/] [gold/]                                    <br> <gold></gold>
+    <<m:text>>                                       its plural, or one after a 1 ("1 [turn/] <<m:Turn>>")
+    1 Turns, 3 Turn (a link the game counts)         1 Turn, 3 Turns: a number decides the form (agree)
 The GLOBAL names are the keys of the game's tooltip libraries (TEDataStoreResource: "Tooltip Global Library", ...).
 A text several resources show with different values takes the values most of them have.
 """
