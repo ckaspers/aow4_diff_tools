@@ -482,13 +482,17 @@ def build_concepts(texts_of, old):
 
 
 DESCRIPTION_FIELDS = ('Screen Description', 'Description', 'Description String', 'Tooltip Description', 'Lore')
+# the icon a resource's tooltip shows, of the icons it links to (not a banner's, an orbit's or a resource overlay's)
+ICON_FIELDS = ('Large Icon Link', 'Icon Link', 'Icon', 'TML Icon Link', 'Shield Icon Link')
 
 
-def build_grouped(texts_of, texts, out, site):
+def build_grouped(texts_of, texts, out, site, libraries, write_icons=True):
     """concept tooltips for the links to a property, unit, equipment... ([hyperlink,GLOBAL.PROPERTIES.BURNING]): the
-    resource with that DataStoreTag, its Screen Name and description. Left out where the site already shows the
-    ability of that name (Data/EN/Abilities.json, Data/GEN/ExtraToolTips.json, and LinkedAbilities.json, which
-    abilities.py writes before), whose tooltip has its icon."""
+    resource with that DataStoreTag, its Screen Name, description and icon: "image", the icon resource's id, exported
+    to Icons/UnitIcons/<id>.png as abilities.py exports an ability's (Seal of Transference's red seal). Left out where
+    the site already shows the ability of that name (Data/EN/Abilities.json, Data/GEN/ExtraToolTips.json, and
+    LinkedAbilities.json, which abilities.py writes before), whose tooltip has its icon."""
+    import abilities as linked_abilities, clbicons  # abilities.py imports this file
     abilities = set()
     for path in (os.path.join(site, 'Data', 'EN', 'Abilities.json'), os.path.join(site, 'Data', 'GEN', 'ExtraToolTips.json'),
                  os.path.join(site, 'Data', 'GEN', 'LinkedAbilities.json')):
@@ -499,7 +503,7 @@ def build_grouped(texts_of, texts, out, site):
     for e in texts:
         for v in e.values():
             if isinstance(v, str): linked.update(re.findall(r'\[hyperlink,(GLOBAL\.[A-Z_]+\.[A-Za-z0-9_]+)\]', v))
-    made = 0
+    made, icons = 0, 0
     for key in sorted(linked):
         group, tag = key.split('.')[1:]
         rid = next(iter(texts_of.tagged_all(tag)), None)
@@ -513,7 +517,20 @@ def build_grouped(texts_of, texts, out, site):
         if not description.strip(): continue
         out[key] = {'name': name, 'icon': None, 'globalName': key, 'displayHtml': name, 'description': description}
         made += 1
-    return made
+        # the first icon the game's libraries hold as an image (a unit's icon is drawn from its model: none)
+        f = fields(texts_of.game.node(rid))
+        for n in ICON_FIELDS:
+            link = refs(f.get(n))
+            icon = link[0][1] if link else None
+            found = linked_abilities.icon_image(texts_of.game.raw[icon], libraries) if icon in texts_of.game.raw else None
+            if not found or found[1]['format'] != clbicons.RGBA: continue
+            png = os.path.join(site, 'Icons', 'UnitIcons', '%s.png' % icon)
+            if write_icons and not os.path.exists(png):
+                clbicons.write_png(png, found[1]['width'], found[1]['height'], found[0].pixels(found[1]))
+                icons += 1
+            out[key]['image'] = icon
+            break
+    return made, icons
 
 
 def main():
@@ -540,9 +557,12 @@ def main():
     cpath = os.path.join(site, 'Data', 'EN', 'concept_tooltips.json')
     old_concepts = json.load(open(cpath, encoding='utf-8-sig')) if os.path.exists(cpath) else {}
     concepts, made = build_concepts(texts, {k: v for k, v in old_concepts.items() if k.count('.') == 1})
-    grouped = build_grouped(texts, new, concepts, site)
+    import abilities  # it imports this file
+    grouped, icons = build_grouped(texts, new, concepts, site, abilities.icon_images(cfg), not args.dry_run)
     print('%d concepts: %d from the game, %d the game no longer has kept, %d links to properties, units and the like'
-          % (len(concepts), made, len(concepts) - made - grouped, grouped))
+          ' (%d with an icon, %d icons exported)'
+          % (len(concepts), made, len(concepts) - made - grouped, grouped,
+             sum('image' in c for c in concepts.values()), icons))
     if args.dry_run: return new, concepts
     with open(path, 'w', encoding='utf-8', newline='\n') as f:
         json.dump(new, f, indent=2, ensure_ascii=False)
