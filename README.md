@@ -123,8 +123,10 @@ it no longer has are kept, as pages may still look them up.
   by its Screen Name.
 - Typed-in values come from the text links that show the text; where they differ, the values most of
   them have. A text no resource shows keeps the site's wording.
-- `{TAG>Field}` is filled only when it is clear: one resource holds the tag, one of those the text's
-  resources link to, or all of them give the same value, and the field is a whole number. Several
+- `{TAG>Field}` is filled only when it is clear: one resource holds the tag, the nearest of those the
+  text's resources link to (Chaos Pulse reaches its Insanity four links on), or all of them give the same
+  value, and the field is a whole number. The tag can be on an object inside a resource, and a text link
+  can type the path in (`{hex}` = `{CHAOS_PULSE_CIRCLE_TARGETER>AREA>Radius}`). Several
   resources can share a tag (three hold `STUNNED_EFFECT_DESCRIPTION`, one with 6 turns). A field left
   at its default is not written: its default comes from the schema (`Num Turns` 1). A few fields go by
   another name in the editor: `ResolvedStrength` is a resistance check's Strength × 10 (9 is a base

@@ -179,6 +179,8 @@ class Texts:
         # which resources hold a text id or a tag: a decode is slow, a byte search is not
         want = {m.encode() for m, s in texts.items() if needs_resource(s)}
         want |= {t.encode() for s in texts.values() for t in re.findall(r'\{(?:GLOBAL\.[A-Z_]+\.)?([A-Za-z0-9_]+)(?:>|\.Hyperlink\}|\.Name\}|\})', s)}
+        # and the data store paths a text link types in ({hex} = "{CHAOS_PULSE_CIRCLE_TARGETER>AREA>Radius}")
+        want |= {t for raw in game.raw.values() for t in re.findall(rb'\{([A-Za-z0-9_]+)>', raw)}
         self.where = collections.defaultdict(list)
         for rid, raw in game.raw.items():
             for tok in set(TOKEN.findall(raw)) & want: self.where[tok.decode()].append(rid)
@@ -206,26 +208,45 @@ class Texts:
         return out
 
     def tagged_all(self, tag):
-        """the resources whose DataStoreTag is tag: several can share one (three hold STUNNED_EFFECT_DESCRIPTION)"""
+        """the resources whose DataStoreTag is tag, or that hold an object with it (Chaos Pulse's targeter is written
+        inside the ability): several can share one (three hold STUNNED_EFFECT_DESCRIPTION)"""
         if tag not in self._tagged:
-            self._tagged[tag] = [r for r in self.where.get(tag, [])
-                                 if value(fields(self.game.node(r)).get('DataStoreTag')) == tag]
+            self._tagged[tag] = [r for r in self.where.get(tag, []) if self.tag_node(r, tag)]
         return self._tagged[tag]
+
+    def tag_node(self, rid, tag):
+        """the resource if its DataStoreTag is tag, else the first object in it whose DataStoreTag is"""
+        def find(n):
+            if not n: return None
+            if n[0] == 'o':
+                if value(fields(n).get('DataStoreTag')) == tag: return n
+                for l, o, v in n[2]:
+                    got = find(v)
+                    if got: return got
+            elif n[0] == 'l':
+                for x in n[1]:
+                    got = find(x)
+                    if got: return got
+            return None
+        return find(self.game.node(rid))
 
     def tagged(self, tag, context=()):
         """the resource with DataStoreTag tag the game would take: the only one, else the only one the text's own
         resources link to (or the resources they link to)"""
         found = self.tagged_all(tag)
         if len(found) <= 1: return found[0] if found else None
-        near = [r for r in found if r in self.linked(context)]
-        return near[0] if len(near) == 1 else None
+        # the nearest: Chaos Pulse reaches its Insanity through its plugin, randomizer and effect
+        for depth in range(2, 6):
+            near = [r for r in found if r in self.linked(context, depth)]
+            if near: return near[0] if len(near) == 1 else None
+        return None
 
-    def linked(self, rids):
-        """the resources these link to, and the ones those link to"""
-        key = tuple(sorted(rids))
+    def linked(self, rids, depth=2):
+        """the resources these link to, and the ones those link to, depth links on"""
+        key = (tuple(sorted(rids)), depth)
         if key not in self._linked:
             out, step = set(rids), set(rids)
-            for _ in range(2):
+            for _ in range(depth):
                 nxt = set()
                 for r in step:
                     if r in self.game.raw: nxt |= {i for n, i in all_refs(self.game.node(r))}
@@ -234,8 +255,9 @@ class Texts:
             self._linked[key] = out
         return self._linked[key]
 
-    def link_text(self, rid, *names):
-        """the text of the first of a resource's text links named in names, filled in with its own values"""
+    def link_text(self, rid, *names, own=True):
+        """the text of the first of a resource's text links named in names, filled in with its own values; own: the
+        resource is the text's context (of the effects sharing a tag, the one it links to)"""
         f = fields(self.game.node(rid))
         for n in names:
             link = f.get(n)
@@ -244,7 +266,7 @@ class Texts:
                 found = tooltips.links(link)
                 # a key typed in with no value ("{GLOBAL.UnitConcept.Hyperlink}" = "") is filled as usual
                 vals = {k: v for k, v in found[0][2] if v not in (None, '')} if found else {}
-                return self.fill(self.T[mid], vals, mid)
+                return self.fill(self.T[mid], vals, mid, (rid,) if own else ())
         return None
 
     def concept(self, key, part):
@@ -272,7 +294,10 @@ class Texts:
 
     def grouped(self, group, tag, part):
         """{GLOBAL.PROPERTIES.<tag>} and the like: the resource with that DataStoreTag, by its Screen Name"""
-        name = next((n for n in (self.link_text(r, 'Screen Name', 'Name', 'Title String') for r in self.tagged_all(tag))
+        # named after the first of the resources with that tag: its own values only when it is the only one ("2 Extra
+        # Retaliations" and "Extra Retaliation" share EXTRA_RETALIATION)
+        found = self.tagged_all(tag)
+        name = next((n for n in (self.link_text(r, 'Screen Name', 'Name', 'Title String', own=len(found) == 1) for r in found)
                      if n is not None), None)
         if name is None:
             self.unresolved['GLOBAL.%s.%s' % (group, tag)] += 1
@@ -307,14 +332,15 @@ class Texts:
     def stored_in(self, rid, key):
         parts = key.strip('{}').split('>')
         hints, field = [p.lower() for p in parts[1:-1]], parts[-1].replace(' ', '').lower()
-        v = self.field_value(rid, hints, field)
+        node = self.tag_node(rid, parts[0])
+        v = self.field_value(node, hints, field)
         if v is None and field in STORED_AS:
             field, factor = STORED_AS[field]
-            v = self.field_value(rid, hints, field)
+            v = self.field_value(node, hints, field)
             if v is not None: v = str(int(v) * factor)
         return v
 
-    def field_value(self, rid, hints, field):
+    def field_value(self, node, hints, field):
         found = []
         def walk(n, path):
             if not n: return
@@ -333,7 +359,7 @@ class Texts:
                     if d is not None: found.append((path + '/' + field, d))
             elif n[0] == 'l':
                 for x in n[1]: walk(x, path)
-        walk(self.game.node(rid), '')
+        walk(node, '')
         for h in hints:
             narrowed = [f for f in found if h in f[0]]
             if narrowed: found = narrowed

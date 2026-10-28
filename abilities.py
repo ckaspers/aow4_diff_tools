@@ -55,14 +55,22 @@ class Abilities:
         t = self.T.link_text(rid, field)
         return alltexts.site_markup(t or '').replace('\0', '<eventColor>{').replace('\1', '}</eventColor>')
 
+    def plugin(self, f):
+        """the ability's default plugin, which can hold its damage and more requisites (Exsanguinate's Single Shot)"""
+        p = refs(f.get('DefaultPluginLink'))
+        return fields(fields(self.game.node(p[0][1])).get('Plugin')) if p and p[0][1] in self.game.raw else {}
+
     def damage(self, f):
-        eff = refs(f.get('PrimaryEffectLink'))
-        if not eff or eff[0][1] not in self.game.raw: return ''
-        block = next((v for l, o, v in self.game.node(eff[0][1])[2] if o == 'TCombatDamageBlock' or
-                      (v and v[0] == 'o' and v[1] == 'TCombatDamageBlock')), None)
-        got = fields(block)
-        return ''.join('%s<%s></%s> ' % (value(got[k]), tag, tag) for k, tag in DAMAGE
-                       if value(got.get(k)) not in (None, '0'))
+        """the primary effect's damage, else that of the default plugin's first effect that deals some"""
+        for n, rid in refs(f.get('PrimaryEffectLink')) + refs(self.plugin(f).get('Effects')):
+            if rid not in self.game.raw: continue
+            block = next((v for l, o, v in self.game.node(rid)[2] if o == 'TCombatDamageBlock' or
+                          (v and v[0] == 'o' and v[1] == 'TCombatDamageBlock')), None)
+            got = fields(block)
+            dealt = ''.join('%s<%s></%s> ' % (value(got[k]), tag, tag) for k, tag in DAMAGE
+                            if value(got.get(k)) not in (None, '0'))
+            if dealt: return dealt
+        return ''
 
     def entry(self, rid):
         g, f = self.game, fields(self.game.node(rid))
@@ -91,7 +99,8 @@ class Abilities:
         start = value(f.get('StartingCooldown'))
         if start:    # its turns only when they differ from the cooldown's
             notes.append(self.text('INTERFACE@ABILITY@STARTS_ON_COOLDOWN') + ('' if start == cooldown else ': %s<turn></turn>' % start))
-        requisites = list(dict.fromkeys(self.link(i, 'Screen Name Link') for n, i in refs(f.get('Requisites')) if i in g.raw))
+        requisites = list(dict.fromkeys(self.link(i, 'Screen Name Link') for n, i in
+                                        refs(f.get('Requisites')) + refs(self.plugin(f).get('Requisites')) if i in g.raw))
         icon = refs(f.get('Large Icon Link'))
         return {'name': alltexts.plain_name(self.link(rid, 'Screen Name')), 'slug': rid,
                 'description': self.link(rid, 'Screen Description'), 'damage': self.damage(f),
