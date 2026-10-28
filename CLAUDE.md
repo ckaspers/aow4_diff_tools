@@ -129,9 +129,13 @@ TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
   name, fields table, body found by its values; id + 1); by image name where an atlas's records aren't found.
 - `clbicons.py` standalone: list, find and export images of the game's `.clb` content libraries
   (standard library only: its own LZ4 block decoder and PNG writer).
-- `magicmaterials.py` standalone: magic material sets and materials for the website (`Texts` fills a
-  text link from its own replacements, `{TAG>ADD>Field}` from the DataStoreTag resource; references
-  are followed by id, as a renamed resource keeps its old name in links).
+- `magicmaterials.py` standalone: magic material sets and materials for the website (texts filled by
+  `alltexts.Texts`, as all.json's are; references are followed by id, as a renamed resource keeps its
+  old name in links).
+- Plurals (`alltexts.many`, `agree`): the game writes `<<m:...>>` for a plural whatever the number and one form
+  after `{amount}`. A link the game ever asks the plural of (`COUNTED`: Turn, Hit Point, Unit...) takes the form
+  of the number before it ("1 Turn", "3 Turns"); not after a tier ("Tier 1 Units") nor when it describes the noun
+  after it ("a 3 Turn cooldown", "3 Tentacle units"). Gold, Fire Damage and the like are never counted.
 - `template.html` the viewer; the report data is injected as JSON at `__DATA__`. Mod-report
   sections: Not merged, Tooltip keys, Possibly old content, Deleted, No target, Layout-only,
   Repeated, Overrides.

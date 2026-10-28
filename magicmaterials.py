@@ -6,17 +6,16 @@ texts, local income and combat enchantment, read from the live game, with a mod 
 Writes Data/GEN/MagicMaterials.json. The site folder is --site, else config.json's "site"; the mod is --acp,
 else the first .acp in the Mods folder.
 
-Why not the site's all.json: it comes from upstream, with the numbers of their vanilla game at the time
-(Focus Crystals +10% where the game now says +20%) and none of a mod's changes. Here every text is the
-live game's or the mod's own, filled in with the values of the resource that shows it.
+Every text is the live game's or the mod's own, filled in with the values of the resource that shows it and
+written as all.json's are (alltexts.Texts): a concept link in the concept's own words ("Every [turn/] Turn"), a
+counted one agreeing with its number ("1 Turn", "2 Turns").
 
     sets        key (DataStoreTag), category, name, description: texts; required: how many materials;
                 unique: whether they must differ; materials: their keys
     materials   key -> name, description (global effect), lore, income [[resource, value]] (local),
                 combat {name, description}, dlc (as the site's dlcMap names it)
 
-Texts are in the site's format: <bulletlist><bullet>, <icon></icon>, [hyperlink,GLOBAL.X]{GLOBAL.X}[/hyperlink]
-(the braces ask the site for the concept's own name, as the game does).
+Texts are in the site's format: <bulletlist><bullet>, <icon></icon>, [hyperlink,GLOBAL.X]words[/hyperlink].
 """
 import argparse, datetime, json, os, re, sys
 
@@ -29,103 +28,14 @@ REQUIRED_DEFAULT = 3
 UNIQUE_DEFAULT = True
 
 
-def replacements(link):
-    """{key: value} of a text link's replacements that carry a value"""
-    out = {}
-    r = fields(link).get('replacements')
-    for it in (r[1] if r and r[0] == 'l' else []):
-        f = fields(it)
-        k, v = value(f.get('key')), value(f.get('value'))
-        if k and v is not None: out[k] = v
-    return out
+def text_of(T, rid, field):
+    """a resource's text as all.json's are written (alltexts.py): its own values, concept links as the game words them"""
+    t = T.link_text(rid, field)
+    return alltexts.site_markup(t or '').replace('\0', '<eventColor>{').replace('\1', '}</eventColor>')
 
 
-def concept_renderings(site):
-    """GLOBAL.X -> how the dump writes that concept's link, icon included: the dump's texts are the only
-    place the site has them all ("<knowledge></knowledge> [hyperlink,GLOBAL.KnowledgeConcept]Knowledge[/hyperlink]")"""
-    seen = {}
-    for e in json.load(open(os.path.join(site, 'Data', 'EN', 'all.json'), encoding='utf-8-sig')):
-        for v in e.values():
-            if not isinstance(v, str) or '[hyperlink,' not in v: continue
-            for m in re.finditer(r'((?:<(\w+)></\2> ?)?)\[hyperlink,(GLOBAL\.[\w.]+)\](.*?)\[/hyperlink\]', v):
-                if m.group(2) in ('bullet', 'br', 'eventColor'): continue    # not an icon
-                if 'eventColor' in m.group(4): continue                      # another text's colouring
-                c = seen.setdefault(m.group(3), {})
-                c[m.group(0)] = c.get(m.group(0), 0) + 1
-    # the most common way, one that names the concept over "{<hp></hp>}" (which leaves the name to the site)
-    return {k: max(c, key=lambda r: ('{' not in r, c[r])) for k, c in seen.items()}
-
-
-class Texts:
-    def __init__(self, game, texts, concepts, warn):
-        self.game, self.T, self.concepts, self.warn = game, texts, concepts, warn
-        self.tagged = {}
-
-    def stored(self, key):
-        """{TAG>ADD>MaxRange}: the field of the resource with that DataStoreTag; an ADD takes it from the
-        block that adds (Range To Add, not Range Floors)"""
-        tag, op, field = key.strip('{}').split('>')
-        if tag not in self.tagged:
-            # the tag is stored as text: only resources holding it need decoding
-            self.tagged[tag] = next((r for r, raw in self.game.raw.items() if tag.encode() in raw
-                                     and value(fields(self.game.node(r)).get('DataStoreTag')) == tag), None)
-        rid = self.tagged[tag]
-        if not rid: self.warn.append('no resource for %s' % key); return None
-        found = []
-        def walk(n, path):
-            if not n: return
-            if n[0] == 'o':
-                for (l, o, v) in n[2]:
-                    if l.replace(' ', '').lower() == field.lower() and value(v) is not None: found.append((path + '/' + l, value(v)))
-                    walk(v, path + '/' + l)
-            elif n[0] == 'l':
-                for x in n[1]: walk(x, path)
-        walk(self.game.node(rid), '')
-        if op == 'ADD': found = [f for f in found if 'add' in f[0].lower()] or found
-        if not found: self.warn.append('no field for %s' % key); return None
-        return found[0][1]
-
-    def __call__(self, link):
-        """a text link (msgid + replacements) as the site shows texts"""
-        mid = msgid(link)
-        if not mid: return ''
-        s = self.T.get(mid)
-        if s is None: self.warn.append('no text for ' + mid); return ''
-        vals = replacements(link)
-        def fill(m):
-            key = m.group(0)
-            if key in vals: return vals[key]
-            g = re.match(r'^\{(GLOBAL\.[\w.]+?)(?:\.Hyperlink)?\}$', key)
-            if g:
-                if g.group(1) in self.concepts: return self.concepts[g.group(1)]
-                self.warn.append('%s: the dump never links %s' % (mid, g.group(1)))
-                # braces the next round must not fill again; put back at the end
-                return '[hyperlink,%s]\0%s\1[/hyperlink]' % (g.group(1), g.group(1))
-            if key.count('>') == 2:
-                v = self.stored(key)
-                if v is not None: return v
-            self.warn.append('%s: %s left unfilled' % (mid, key))
-            return key
-        # a value can hold a key of its own ("15 {GLOBAL.SpiritDamageConcept.Hyperlink}"): fill until done
-        for _ in range(3):
-            filled = re.sub(r'\{[^{}<\[\]]+\}', fill, s)    # not "{<hp></hp>}": the site names that concept
-            if filled == s: break
-            s = filled
-        return site_markup(s.replace('\0', '{').replace('\1', '}'))
-
-    def name(self, link):
-        """a name without the game's grammar marks ("Arcanium Ore^ns")"""
-        return self(link).split('^')[0]
-
-
-def site_markup(s):
-    """the game's markup as the site writes it: the same as all.json's (alltexts.py)"""
-    return alltexts.site_markup(s)
-
-
-def build(game, texts, site):
+def build(game, T):
     warn = []
-    text = Texts(game, texts, concept_renderings(site), warn)
 
     materials, tags_of = {}, {}
     for rid in game.of_class('TStructureR'):
@@ -135,8 +45,8 @@ def build(game, texts, site):
         giver = {}
         for e in (f['Entries'][1] if f.get('Entries') and f['Entries'][0] == 'l' else []):
             if value(fields(e).get('List')) == 'STRUCTUREPROPERTYGIVER': giver = fields(e)
-        m = {'name': text.name(f.get('Screen Name')), 'description': text(f.get('Screen Description')),
-             'lore': text(f.get('Screen Lore Description')), 'income': []}
+        m = {'name': text_of(T, rid, 'Screen Name'), 'description': text_of(T, rid, 'Screen Description'),
+             'lore': text_of(T, rid, 'Screen Lore Description'), 'income': []}
         # by id: a reference keeps its old name when the resource is renamed (Silvertongue Fruit's income
         # is "Euphoric Trollstools Node - Sector Income" now)
         for p, i in refs(giver.get('Sector Properties')):
@@ -145,7 +55,7 @@ def build(game, texts, site):
         for p, i in refs(giver.get('Structure Properties')):
             cf = fields(game.node(i)) if i in game.raw else {}
             if msgid(cf.get('Screen Name')):
-                m['combat'] = {'name': text.name(cf.get('Screen Name')), 'description': text(cf.get('Description'))}
+                m['combat'] = {'name': text_of(T, i, 'Screen Name'), 'description': text_of(T, i, 'Description')}
                 break
         else:
             warn.append('%s: no combat enchantment' % key)
@@ -163,8 +73,8 @@ def build(game, texts, site):
         req, uniq = value(f.get('Required Amount')), value(f.get('Requires Unique Tokens'))
         key = value(f.get('DataStoreTag')) or re.sub(r' - Token Set Bonus$', '', game.name(rid))
         sets.append({'key': re.sub(r'\W+', '_', key).lower(),
-                     'category': text.name(f.get('Category Name')), 'name': text.name(f.get('Screen Name')),
-                     'description': text(f.get('Screen Description')),
+                     'category': text_of(T, rid, 'Category Name'), 'name': text_of(T, rid, 'Screen Name'),
+                     'description': text_of(T, rid, 'Screen Description'),
                      'required': int(req) if req is not None else REQUIRED_DEFAULT,
                      'unique': (uniq == 'true') if uniq is not None else UNIQUE_DEFAULT,
                      'materials': members})
@@ -186,8 +96,8 @@ def main():
     if not site: sys.exit('which website? pass --site or set "site" in config.json')
     acp = None if args.no_mod else args.acp or (aow4diff.mod_acps(cfg) or [None])[0]
     game = Game(cfg, acp)
-    texts = tooltips.load_texts(cfg['game'], os.path.dirname(acp) if acp else '')
-    data, warn = build(game, texts, site)
+    T = alltexts.Texts(game, tooltips.load_texts(cfg['game'], os.path.dirname(acp) if acp else ''))
+    data, warn = build(game, T)
     data = {'generated': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), 'build': aow4diff.build_label(cfg['game']),
             'mod': os.path.splitext(os.path.basename(acp))[0] if acp else None, **data}
     out = args.out or os.path.join(site, 'Data', 'GEN', 'MagicMaterials.json')

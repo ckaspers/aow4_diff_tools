@@ -5,8 +5,7 @@ Data/EN/concept_tooltips.json), read from the live game with a mod on top if one
 
 all.json holds a text "<id>@<FIELD>" as {"id": <id>, "<field>": text}, one entry per id, sorted by id; an id that
 starts with DLC@ also has "DLC": its second part. Texts the game no longer has stay as they are, as pages may still
-look them up. Run it after copying a new DUMPALL dump into the website and before magicmaterials.py, which learns how
-the site words its links from all.json.
+look them up. Run it after copying a new DUMPALL dump into the website.
 
 How a text is written for the site:
     {GLOBAL.XConcept.Hyperlink}, {GLOBAL.XConcept}   the concept's own Hyperlink text ("[gold/] [hyperlink,...]Gold[/hyperlink]")
@@ -138,10 +137,65 @@ def plural(phrase):
     return one(phrase)
 
 
+def singular(phrase):
+    """the singular of a plural that plural() makes ("Turns" -> "Turn", "Negative Status Effects" -> "Negative Status
+    Effect", "Beacons of Unity" -> "Beacon of Unity"); a phrase that is none stays as it is ("Turn", "Status")"""
+    m = re.match(r'^(.*?)(\w+)( of .*)$', phrase) if ' of ' in phrase else re.match(r'^(.*?)(\w+)(\W*)$', phrase)
+    if not m or re.search(r'(ss|us|is)$', m.group(2)): return phrase
+    w = m.group(2)
+    for one in [k for k, v in IRREGULAR.items() if v == w.lower() and k != v] + [w[:-3] + 'y', w[:-2], w[:-1]]:
+        one = w[0] + one[1:] if w[:1].isupper() and one else one
+        if len(one) > 1 and not one.endswith('s') and plural_word(one) == w: return m.group(1) + one + m.group(3)
+    return phrase
+
+
+# the links the game counts: those its texts ever ask the plural of ("<<m:{GLOBAL.TurnConcept.Hyperlink}>>"). A
+# number before one says its form, "1 Turn", "3 Turns", where the game's texts write one form for any number
+# ("for {duration} <<m:{GLOBAL.TurnConcept}>>"). Gold, Fire Damage and the like the game never counts
+COUNTED = set()
+
+
+def learn_counted(texts):
+    COUNTED.update(re.findall(r'<<m:\s*\{(GLOBAL\.[\w.]+?)(?:\.Hyperlink|\.Name)?\}>>', '\n'.join(texts.values())))
+
+
+# a number, an icon maybe, and a link: "1 <turn></turn> [hyperlink,GLOBAL.TurnConcept]Turns[/hyperlink]"; not the
+# second of "0/2"
+COUNT = re.compile(r'(?<![\w./])([+-]?\d+(?:\.\d+)?)(\s*(?:<(\w+)></\3>\s*)?'
+                   r'\[hyperlink,(GLOBAL\.[\w.]+)\](?:<(\w+)></\5>\s*)?)([^\[\]<]+?)(\[/hyperlink\])')
+# a number that is no count: a tier ("Tier 1 Units", "tier 4 and 5 Dragon Units")
+NOT_A_COUNT = re.compile(r'(?i)\b(?:tier|rank|level)\s+(?:\d+\s*(?:and|or|to|-|,)\s*)?$')
+# a link that describes the noun after it, which the number counts: "a 3 Turn cooldown", "3 Tentacle units", "the 7
+# City hexes", "0/2 Magic Material Sets", "Dragon [hyperlink,...]Units"
+DESCRIBES = re.compile(r'\s*(?:\[hyperlink|[A-Z]|(?:units?|hex(?:es)?|capacity|cooldown|regeneration|income|upkeep|cost|'
+                       r'bonus|duration|limit|range)\b)')
+
+
+def agree(s):
+    """a counted link takes the form of the number before it"""
+    def one(m):
+        if m.group(4) not in COUNTED or NOT_A_COUNT.search(s, 0, m.start()) or DESCRIBES.match(s, m.end()):
+            return m.group(0)
+        words = singular(m.group(6))
+        if abs(float(m.group(1))) != 1: words = plural(words)
+        return m.group(1) + m.group(2) + words + m.group(7)
+    return COUNT.sub(one, s)
+
+
+def many(s):
+    """the game's plurals ("<<m:{GLOBAL.CityConcept.Hyperlink}>>": Cities), but one after a count of one ("1 [turn/]
+    <<m:Turn>>")"""
+    def one(m):
+        n = re.search(r'(?<![\w./])[+-]?1\s*(?:\[\w+/\]\s*|<(\w+)></\1>\s*)?$', s[:m.start()])
+        if n and not NOT_A_COUNT.search(s, 0, n.start()): return m.group(1)
+        return plural(m.group(1))
+    return re.sub(r'<<m:(.*?)>>', one, s)
+
+
 def site_markup(s):
     # the game's own slip: "[hyperlink.RoutingConcept.HeroConcept]<<Routed>>[/hyperlink]" (Immortals)
     s = re.sub(r'\[hyperlink\.(\w+)(?:\.\w+)*\]', r'[hyperlink,GLOBAL.\1]', s)
-    s = re.sub(r'<<m:(.*?)>>', lambda m: plural(m.group(1)), s)   # "<<m:{GLOBAL.CityConcept.Hyperlink}>>": Cities
+    s = many(s)
     s = re.sub(r'<<([^<>:]*)>>', r'\1', s)     # a plain form: "<<Routed>>"
     s = s.replace(NO_PLURAL, '')
     s = re.sub(r'\^[A-Za-z]+', '', s)          # grammar marks: "Meds^z", "Arcanium Ore^ns"
@@ -159,7 +213,8 @@ def site_markup(s):
     # not "+2<allegiance></allegiance>Allegiance" (Void Stones)
     s = re.sub(r'([0-9%])((?:\[hyperlink,[^\]]*\])?<(\w+)></\3>)',
                lambda m: m.group(0) if m.group(3).lower() in NOT_ICONS else m.group(1) + ' ' + m.group(2), s)
-    return re.sub(r'(<(\w+)></\2>)(?=[A-Za-z])', lambda m: m.group(1) + ('' if m.group(2).lower() in NOT_ICONS else ' '), s)
+    s = re.sub(r'(<(\w+)></\2>)(?=[A-Za-z])', lambda m: m.group(1) + ('' if m.group(2).lower() in NOT_ICONS else ' '), s)
+    return agree(s)
 
 
 NOT_ICONS = {'br', 'bullet', 'bulletlist'}
@@ -173,6 +228,7 @@ def plain_name(s):
 class Texts:
     def __init__(self, game, texts):
         self.game, self.T = game, texts
+        learn_counted(texts)
         self.stats = collections.Counter()
         self.unresolved = collections.Counter()
         print('indexing the game\'s resources...', flush=True)
@@ -438,8 +494,8 @@ def build(texts_of, old):
         if mid in texts_of.unused and TYPED.search(texts_of.T[mid]) and field in e:
             # its wording stays; its lists and plural forms are written as the site's other texts
             text = re.sub(r'\[hyperlink\.(\w+)(?:\.\w+)*\]', r'[hyperlink,GLOBAL.\1]', e[field])
-            text = re.sub(r'<<([^<>:]*)>>', r'\1', re.sub(r'<<m:(.*?)>>', lambda m: plural(m.group(1)), text))
-            e[field] = style_tags(rebuild_lists(text))
+            text = re.sub(r'<<([^<>:]*)>>', r'\1', many(text))
+            e[field] = agree(style_tags(rebuild_lists(text)))
             kept += 1
             continue
         if id_.startswith('DLC@') and 'DLC' not in e: e['DLC'] = id_.split('@')[1]
@@ -465,7 +521,7 @@ def build_concepts(texts_of, old):
         title_mid, desc_mid, link_mid = mid('Title String'), mid('Description String'), mid('Hyperlink')
         if not title_mid or title_mid not in texts_of.T: continue
         title = texts_of(title_mid)
-        name = re.sub(r'\s+', ' ', re.sub(r'<[^>]+>|\[/?hyperlink[^\]]*\]', '', title)).strip()
+        name = re.sub(r'\s+', ' ', re.sub(r'<[^>]+>|\[/?hyperlink[^\]]*\]|\[\w+/\]', '', title)).strip()
         if not name: continue
         link = texts_of(link_mid) if link_mid and link_mid in texts_of.T else ''
         # the icon: the Title's, else the Hyperlink's, else the one the site had ("personalityAstral02")
@@ -510,7 +566,8 @@ def build_grouped(texts_of, texts, out, site, libraries, write_icons=True):
         if not rid: continue
         name = texts_of.link_text(rid, 'Screen Name', 'Name', 'Title String')
         if not name: continue
-        name = plain_name(re.sub(r'<[^>]+>|\[/?hyperlink[^\]]*\]', '', name))
+        # without the icon of its kind: "[conduit/] Altar of Marching Gloom" is the Altar of Marching Gloom
+        name = plain_name(re.sub(r'<[^>]+>|\[/?hyperlink[^\]]*\]|\[\w+/\]', '', name))
         if not name or name.lower() in abilities: continue
         description = texts_of.link_text(rid, *DESCRIPTION_FIELDS) or ''
         description = site_markup(description).replace('\0', '<eventColor>{').replace('\1', '}</eventColor>')

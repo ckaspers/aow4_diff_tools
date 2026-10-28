@@ -189,9 +189,9 @@ picks another, `--no-mod` reads the game alone.
 how many materials it needs (a field the decoder hides at its default of 3, different ones unless the
 set turns that off), and each material's name, global effect, lore, local income and combat
 enchantment. Texts are the game's or the mod's own, filled in with the values of the resource that
-shows them, so they follow game updates and the mod. Concept links are written the way the site's
-`all.json` writes them, icons included, so run it after `alltexts.py`, with the same `--site`, `--acp` and
-`--no-mod` as `citytree.py`.
+shows them, so they follow game updates and the mod, and written as `alltexts.py` writes `all.json`'s
+(concept links in the concept's own words, "1 Turn" and "2 Turns"). Run it with the same `--site`, `--acp`
+and `--no-mod` as `citytree.py`.
 
 ## Icons from the content libraries
 
