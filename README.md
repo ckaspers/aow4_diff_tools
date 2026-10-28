@@ -57,6 +57,7 @@ Other commands:
 | `python citytree.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | city tree links for the same website (see below) |
 | `python magicmaterials.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | magic material sets, texts and income for the same website (see below) |
 | `python clbicons.py find PATTERN` / `list LIBRARY [PATTERN]` / `export LIBRARY NAME OUT.png [--crop]` / `export-all LIBRARY FOLDER [PATTERN]` | icons from the game's content libraries (see below) |
+| `python hudimages.py find PATTERN` / `export PATTERN FOLDER` | images of the game's interface (HUD buttons, frames) by the names its UI gives them (see below) |
 
 Paths live in `config.json` (game folder, Mods folder, snapshots, reports, and `"site"` for
 `alltexts.py`, `spawnsets.py`, `citytree.py` and `magicmaterials.py`).
@@ -216,6 +217,19 @@ its images when the game loads; the library keeps each image separately, so expo
 `--crop` trims the transparent border, which gives the size of the hand-made icons on the website
 (218x248 for a combat enchantment). Icon images are 8-bit RGBA and export as is; other textures
 (block-compressed) are listed but skipped.
+
+## Images of the game's interface
+
+`clbicons.py` sees images that are stored one by one. The interface's (the world map HUD's buttons and frames,
+panels, the DLC skins) are kept as whole atlases, and the game's UI names each image in them in
+`Content/Title/UI/Resources/Atlas/*.xaml`. `hudimages.py` finds them by those names and saves them as PNG:
+
+    python hudimages.py find EmpireButton
+    python hudimages.py export Button_Gem_DEFAULT out
+
+A HUD button is drawn in layers, each its own image of the same size: the round Empire button is
+`ResearchButton_Frame` (the ring), `EmpireButton_Gem_DEFAULT` (the glass) and `EmpireButton_Icon` (the picture),
+stacked in that order from the top. Each state (`_DEFAULT`, `_OVER`, `_DOWN`, ...) is a separate image.
 
 ## Known limits
 

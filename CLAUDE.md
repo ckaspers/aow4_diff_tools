@@ -129,6 +129,10 @@ TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
   name, fields table, body found by its values; id + 1); by image name where an atlas's records aren't found.
 - `clbicons.py` standalone: list, find and export images of the game's `.clb` content libraries
   (standard library only: its own LZ4 block decoder and PNG writer).
+- `hudimages.py` standalone: the interface's images by the names the UI gives them
+  (`Content/Title/UI/Resources/Atlas/*.xaml`: `x:Key` → `[LIBRARY]TXA\<atlas>?<id>`, all 2214 in that one form).
+  Atlases read with `tmlicons.atlases`; the id is the image record's own, no shift (checked against the records'
+  names). The website's menu medallions are built from these (`ResearchButton_Frame`, `*_Gem_DEFAULT`, `*_Icon`).
 - `magicmaterials.py` standalone: magic material sets and materials for the website (texts filled by
   `alltexts.Texts`, as all.json's are; references are followed by id, as a renamed resource keeps its
   old name in links).
