@@ -129,15 +129,18 @@ it no longer has are kept, as pages may still look them up.
   Gold, Fire Damage and the like are never counted.
 - Typed-in values come from the text links that show the text; where they differ, the values most of
   them have. A text no resource shows keeps the site's wording.
-- `{TAG>Field}` is filled only when it is clear: one resource holds the tag, the nearest of those the
-  text's resources link to (Chaos Pulse reaches its Insanity four links on), or all of them give the same
-  value, and the field is a whole number. The tag can be on an object inside a resource, and a text link
-  can type the path in (`{hex}` = `{CHAOS_PULSE_CIRCLE_TARGETER>AREA>Radius}`). Several
-  resources can share a tag (three hold `STUNNED_EFFECT_DESCRIPTION`, one with 6 turns). A field left
-  at its default is not written: its default comes from the schema (`Num Turns` 1). A few fields go by
-  another name in the editor: `ResolvedStrength` is a resistance check's Strength × 10 (9 is a base
-  90% chance), an area's `Radius` its Added radius. Anything unfilled stays
-  `<eventColor>{key}</eventColor>`, as the site shows placeholders.
+- `{TAG>Field}` is the field of the resource with that tag: the text's own, else the nearest of those the
+  text's resources link to (Chaos Pulse reaches its Insanity four links on). The tag can be on an object
+  inside a resource, and a text link can type the path in (`{hex}` = `{CHAOS_PULSE_CIRCLE_TARGETER>AREA>Radius}`).
+  Several resources can share a tag (three hold `STUNNED_EFFECT_DESCRIPTION`, one with 6 turns); when nothing
+  tells which is meant the text shows all their values, "2/4" (an effect and its enhanced form). A field left
+  at its default is not written: its default comes from the schema (`Num Turns` 1). Fields go by another name
+  in the editor (`STORED_AS`: `MaxDistance` is Max Jump Distance, `Regen` Hit points regeneration), and
+  `Resolved...` is a percentage without its sign, which the text writes: Multiplier 1.1 is 10, 0.75 is 25,
+  Critical Chance Bonus 0.2 is 20, a resistance check's Strength 9 is 90. A key the game cut off at 64
+  characters (`...>ResolvedMu`) is matched by its start. Anything unfilled stays
+  `<eventColor>{key}</eventColor>`, as the site shows placeholders. To check the rules, compare with the game's
+  own numbers: a text of `all.json` with the same words as a text of the DUMPALL dump should match it.
 
 It also writes `Data/EN/concept_tooltips.json`: every concept the libraries name, with its Title,
 icon, the wording of its Hyperlink and its Description, links kept (with Selectable Tooltips on, the site opens

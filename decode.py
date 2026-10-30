@@ -72,7 +72,9 @@ def special(cls, fields):
 
 # fields written by helpers the schema scan cannot name (seen in the editor)
 FIELD_LABELS = {'TCombatDefenseBlock': {1: 'Armor', 2: 'Resistance'},
+                'TCombatDefenseBlockMultiplier': {1: 'Armor', 2: 'Resistance'},
                 'TCombatDamageBlock': {1: 'Physical', 2: 'Blight', 3: 'Shock', 4: 'Fire', 5: 'Spirit', 6: 'Frost'}}
+FLOAT_BLOCKS = {'TCombatDefenseBlockMultiplier'}
 
 # members the constructors do not reveal (set through a pointer)
 FIXED_TYPES = {}
@@ -161,9 +163,14 @@ class Decoder:
                 node = self.guess(body)
                 if node[0] != 'l' and bytes(body) in (b'\0', b'\0\0\0\0') and owner and is_list_type(self.S, owner):
                     node = ('l', [])        # a list class with no entries left: a zero count, not an empty object
-                known = FIELD_LABELS.get(self.cls[owner]['n'] if owner else None, {})
+                oname = self.cls[owner]['n'] if owner else None
+                known = FIELD_LABELS.get(oname, {})
+                # by its size, not guessed: a stored 1 reads as a list with one empty entry
+                if fid in known and len(body) == 4:
+                    if oname in FLOAT_BLOCKS: node = ('v', f32(bytes(body)))
+                    else: node = ('v', str(int.from_bytes(body, 'little', signed=True)))
                 lab = known.get(fid) or ('Entries' if node[0] == 'l' else 'field_%d' % fid)
-                if fid in known and node[0] == 'v': node = ('v', node[1], '0')
+                if fid in known and node[0] == 'v': node = ('v', node[1], '0.0' if oname in FLOAT_BLOCKS else '0')
                 out.append((lab, self.cls[owner]['n'] if owner else None, node))
 
     def typed(self, T, b):

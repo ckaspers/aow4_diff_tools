@@ -56,7 +56,8 @@ trigger registry gives script function names; enum tables give enum value names.
 `f` {fid: [name, kind, off, default?]}, `d` {off: [display, type, enum?]}, `m` member types,
 `e` enums. Fields the scan cannot name show as `field_N`; `decode.FIELD_LABELS` names a few by hand
 (confirmed with the user from editor screenshots: TCombatDefenseBlock 1 Armor 2 Resistance;
-TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
+TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost; TCombatDefenseBlockMultiplier the
+same two as floats). These are read by size: `guess` takes a stored 1 for a list with one empty entry.
 
 ## Editor and game semantics (confirmed by the user)
 
@@ -111,8 +112,8 @@ TCombatDamageBlock 1..6 Physical, Blight, Shock, Fire, Spirit, Frost).
 - `citytree.py` standalone: city tree links for the website (`Game` = game + mod packs +
   overrides, `build` → roots, cultures, structures). Imports the modules above, changes none.
 - `alltexts.py` standalone: the website's `Data/EN/all.json` and `concept_tooltips.json` from the live game with the mod (`Texts`: GLOBAL
-  names from the tooltip libraries, typed values from the links that show a text, `{TAG>Field}` only when
-  one resource is meant). `update_site.bat` runs it, then `spawnsets.py`, `citytree.py` and `magicmaterials.py`.
+  names from the tooltip libraries, typed values from the links that show a text, `{TAG>Field}` as the game
+  shows it, all the values, "2/4", when nothing tells which of several resources is meant). `update_site.bat` runs it, then `spawnsets.py`, `citytree.py` and `magicmaterials.py`.
 - `spawnsets.py` standalone: the website's `Data/GEN/all_spawnsets.json`, every `TUnitCategory` with its sets'
   unit names (a set is a `TUnitSet` by SetName, or a unit by its DataStoreTag).
 - `tmlicons.py` standalone: the game's text icons for the website (`Icons/TML`, `Style/tmlicons.css`); `bc7.py`

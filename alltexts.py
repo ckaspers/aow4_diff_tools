@@ -14,8 +14,10 @@ How a text is written for the site:
     {LOC.MSGID}                                      that text
     {key}                                            the value typed into the text link, else <eventColor>{key}</eventColor>
     {TAG>Field}, {TAG>AREA>Radius}                   the field of the resource with that DataStoreTag (or its default) when
-                                                     it holds one clear whole number, else <eventColor>{TAG>Field}</eventColor>
-                                                     (ResolvedStrength: Strength x 10, Radius: Added radius)
+                                                     it holds one clear number, as the game shows it, else
+                                                     <eventColor>{TAG>Field}</eventColor>. Names the editor shows otherwise
+                                                     are in STORED_AS; {TAG>ResolvedX} is X as a percentage (Multiplier
+                                                     1.1: 10, Critical Chance Bonus 0.2: 20, Strength 9: 90)
     [bulletlist][bullet/]...[/bulletlist]           <bulletlist><bullet>...</bullet></bulletlist>, nested lists inside their bullet
     [br/] [gold/]                                    <br> <gold></gold>
     <<m:text>>                                       its plural, or one after a 1 ("1 [turn/] <<m:Turn>>")
@@ -23,7 +25,7 @@ How a text is written for the site:
 The GLOBAL names are the keys of the game's tooltip libraries (TEDataStoreResource: "Tooltip Global Library", ...).
 A text several resources show with different values takes the values most of them have.
 """
-import argparse, collections, json, os, re, sys
+import argparse, collections, decimal, json, os, re, sys
 
 import aow4diff, decode, tooltips
 from citytree import Game, fields, refs, value, msgid
@@ -33,9 +35,48 @@ CONCEPT = 'TDefaultGameConceptDescriptionResource'
 TYPED = re.compile(r'\{(?!GLOBAL\.|LOC\.)[^{}<>\[\]]+\}')
 KEY = re.compile(r'\{[^{}<\[\]]+\}')    # not "{<hp></hp>}": the site names that concept itself
 TOKEN = re.compile(rb'[A-Za-z0-9_@]{3,}')
-# a data store path's field names the editor names otherwise, with the factor the game shows them by:
-# a resistance check's Strength 9 is a base 90% chance, a line's or circle's Added radius its Radius
-STORED_AS = {'resolvedstrength': ('strength', 10), 'radius': ('addedradius', 1)}
+# how the game shows a field's number. It writes no sign of its own: its texts do ("+{...}%", "-{...}%")
+def whole(d): return d
+def absolute(d): return abs(d)
+def percent(d): return abs(d) * 100
+def changed_by(d): return abs(d - 1) * 100    # a multiplier: 1.1 is +10%, 0.75 is -25%
+def missing(d): return (1 - d) * 100          # "units below 60% health": Min Health Missing 0.4
+def tenfold(d): return d * 10                 # a resistance check's Strength 9 is a base 90% chance
+def across(d): return d * 2 + 1               # a line's width, its Added radius on both sides
+
+
+# a data store path's field names the editor names otherwise (without spaces, lower case), and how the game shows them
+STORED_AS = {'radius': ('addedradius', whole), 'width': ('addedradius', across),
+             'maxdistance': ('maxjumpdistance', whole), 'maxjumps': ('maxnumjumps', whole),
+             'regen': ('hitpointsregeneration', whole), 'sightrange': ('sightrangebonus', whole),
+             'sensorrange': ('sensorrangebonus', whole), 'turnstilres': ('turnstilresurrection', whole),
+             'pointstogive': ('operationpointstogive', whole), 'numtargets': ('numberoftargets', whole),
+             'randomhexes': ('amountofrandomhexes', whole), 'xp': ('xptogive', whole),
+             'minheal': ('minamounttoheal', whole), 'maxheal': ('maxamounttoheal', whole),
+             'boostperunit': ('healingboostperunit', whole),
+             'moralechangeabsolute': ('moralechange', absolute), 'health': ('healamount', whole),
+             'resolvedstrength': ('strength', tenfold), 'resolvedmaxhealth': ('minhealthmissing', missing),
+             'successmultiplier': ('successeffectmultiplier', whole), 'negativechange': ('negativeeffectchange', absolute),
+             'resolvedmultiplier': ('multiplier', changed_by),
+             'resolveddamagemultiplier': ('damagemultiplier|damagemultiplierperunit', changed_by),
+             'resolvedhealingmultiplier': ('healingmultiplier', changed_by),
+             'resolvedpenaltymultiplier': ('penaltymultiplier', changed_by),
+             'resolvedcritchancebonus': ('criticalchancebonus', percent),
+             'resolvedfumblechancebonus': ('fumblechancebonus', percent),
+             'resolvedhitpoints': ('hitpointstorestore', percent),
+             'resolvedhealthproportion': ('healthproportionregained', percent),
+             'resolveddamagereflected': ('damageamountreflected', percent),
+             'resolvedproportionheal': ('proportiontoheal', percent),
+             'resolvedhitpointsregained': ('hitpointproportionregained', percent),
+             'resolvedregenmultiplier': ('hitpointsregenerationmultiplier', percent)}
+# a value per income type, the one that is not zero: an upkeep modifier's Upkeep Modifiers and Flat Upkeep
+STORED_PER_INCOME = {'resolvedupkeepmodifier': ('Upkeep Modifiers', percent), 'flatupkeep': ('Flat Upkeep', whole)}
+# the schema has no fractional defaults: these are left out of the resources that keep them, the game's texts show them
+FLOAT_DEFAULTS = {'TTacticalPositionResurrectUnitEffect': {'hitpointstorestore': '0.5'},
+                  'TReduceHealthLossPenaltyProperty': {'penaltymultiplier': '0.5'}}
+# a field of a resource the one with the tag links to (a move setting override's Very Fast Movement Settings)
+STORED_IN_LINK = {'tacticalmovepoints': 'Move Settings Link'}
+KEY_LIMIT = 64    # the game keeps this much of a text's key: "{ASCENSION_..._DAMAGE_MODIFIER>ResolvedMu}"
 def needs_resource(s):
     """whether a text has values only the resources showing it can give: typed-in ones, or a data store path
     whose tag several resources share"""
@@ -159,6 +200,7 @@ COUNTED = set()
 
 def learn_counted(texts):
     COUNTED.update(re.findall(r'<<m:\s*\{(GLOBAL\.[\w.]+?)(?:\.Hyperlink|\.Name)?\}>>', '\n'.join(texts.values())))
+    COUNTED.discard('GLOBAL.CriticalHitConcept')    # "+10 Critical Hit Chance": the number is a percentage, no count
 
 
 # a number, an icon maybe, and a link: "1 <turn></turn> [hyperlink,GLOBAL.TurnConcept]Turns[/hyperlink]"; not the
@@ -293,6 +335,8 @@ class Texts:
         resources link to (or the resources they link to)"""
         found = self.tagged_all(tag)
         if len(found) <= 1: return found[0] if found else None
+        own = [r for r in found if r in context]
+        if len(own) == 1: return own[0]
         # the nearest: Chaos Pulse reaches its Insanity through its plugin, randomizer and effect
         for depth in range(2, 6):
             near = [r for r in found if r in self.linked(context, depth)]
@@ -375,42 +419,66 @@ class Texts:
                     d = S.display(c, f[2]) if f[2] is not None else None
                     if d and f[1] in decode.INT_SLOTS:
                         out.setdefault(d[0].replace(' ', '').lower(), self.game.D.default_text(f, 4))
+            out.update(FLOAT_DEFAULTS.get(cls, {}))
             self._defaults[cls] = out
         return self._defaults[cls]
 
     def stored(self, key, context=()):
         """{TAG>Field} or {TAG>AREA>Radius}: the field of the resource with that DataStoreTag, when it holds one
-        clear whole number. Several resources sharing the tag do when they agree (Infernal Blaze's two)."""
+        clear number. Of several resources sharing the tag, the text's own; when nothing tells which they are versions
+        of one effect, and it shows all their values ("2/4" for an effect and its enhanced form, not one that may be
+        wrong)."""
         tag = key.strip('{}').split('>')[0]
         rid = self.tagged(tag, context)
-        if rid: return self.stored_in(rid, key)
-        vals = {self.stored_in(r, key) for r in self.tagged_all(tag)}
-        return vals.pop() if len(vals) == 1 else None
+        v = self.stored_in(rid, key) if rid else None
+        if v is not None: return v
+        vals = {self.stored_in(r, key) for r in self.tagged_all(tag)} - {None}
+        # no list with a zero or a -1, "forever" (a summon's Turns To Live, a dispel's Num Things To Dispel)
+        if len(vals) > 1: vals = {v for v in vals if int(v) > 0} or vals
+        return '/'.join(sorted(vals, key=lambda v: abs(int(v)))) or None
 
     def stored_in(self, rid, key):
-        parts = key.strip('{}').split('>')
+        path = key.strip('{}')
+        parts = path.split('>')
         hints, field = [p.lower() for p in parts[1:-1]], parts[-1].replace(' ', '').lower()
+        cut = len(path) >= KEY_LIMIT
         node = self.tag_node(rid, parts[0])
-        v = self.field_value(node, hints, field)
-        if v is None and field in STORED_AS:
-            field, factor = STORED_AS[field]
-            v = self.field_value(node, hints, field)
-            if v is not None: v = str(int(v) * factor)
-        return v
+        linked = STORED_IN_LINK.get(field)
+        if linked:
+            r = refs(fields(node).get(linked))
+            if not r or r[0][1] not in self.game.raw: return None
+            node = self.game.node(r[0][1])
+        name = next((k for k in [*STORED_AS, *STORED_PER_INCOME] if k.startswith(field)), field) if cut else field
+        if name in STORED_PER_INCOME:
+            block, show = STORED_PER_INCOME[name]
+            return self.field_value(fields(node).get(block), [], 'value', show, nonzero=True)
+        labels, show = STORED_AS.get(name, ('', None))
+        for label in filter(None, labels.split('|')):
+            v = self.field_value(node, hints, label, show)
+            if v is not None: return v
+        if field.startswith('resolved'):    # any other percentage: ResolvedProcChance, Proc Chance
+            return self.field_value(node, hints, field[len('resolved'):], percent, cut)
+        return self.field_value(node, hints, field, whole, cut)
 
-    def field_value(self, node, hints, field):
+    def field_value(self, node, hints, field, show=whole, cut=False, nonzero=False):
+        """the field's one number as the game shows it, none if it holds several or a fraction. cut: field is the
+        start of a name the game's key limit cut off; nonzero: leave out the zeros"""
         found = []
+        def named(label): return label.startswith(field) if cut else label == field
         def walk(n, path):
             if not n: return
             if n[0] == 'o':
-                have = set()
+                have = False
                 for (l, o, v) in n[2]:
                     p = path + '/' + l.lower()
-                    have.add(l.replace(' ', '').lower())
-                    if l.replace(' ', '').lower() == field and v and v[0] == 'v': found.append((p, value(v)))
+                    if named(l.replace(' ', '').lower()):
+                        have = True
+                        if v and v[0] == 'v': found.append((p, value(v)))
+                    # a circle area with nothing stored reads as an empty tag set: radius 1
+                    if field == 'addedradius' and l == 'Area' and v == ('t', ()): found.append((p, '1'))
                     walk(v, p)
-                if field not in have:
-                    d = self.defaults(n[1]).get(field)
+                if not have:
+                    d = next((x for k, x in self.defaults(n[1]).items() if named(k)), None)
                     # a circle area, a class the schema does not name: its first field is the radius, 1 if left out
                     if d is None and n[1] is None and field == 'addedradius' and path.endswith('/area'):
                         d = value(dict((l, v) for l, o, v in n[2]).get('field_1')) or '1'
@@ -421,9 +489,10 @@ class Texts:
         for h in hints:
             narrowed = [f for f in found if h in f[0]]
             if narrowed: found = narrowed
-        vals = {v for p, v in found}
-        if len(vals) == 1 and re.fullmatch(r'-?\d+', next(iter(vals))): return next(iter(vals))
-        return None
+        vals = {v for p, v in found if not (nonzero and float(v) == 0)}
+        if len(vals) != 1 or not re.fullmatch(r'-?\d+(\.\d+)?', next(iter(vals))): return None
+        shown = show(decimal.Decimal(vals.pop())).normalize()
+        return format(shown, 'f') if shown == shown.to_integral() else None
 
     # ---- texts ----
     def users(self, mid):
