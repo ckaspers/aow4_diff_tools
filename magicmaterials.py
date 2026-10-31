@@ -55,7 +55,8 @@ def build(game, T):
         for p, i in refs(giver.get('Structure Properties')):
             cf = fields(game.node(i)) if i in game.raw else {}
             if msgid(cf.get('Screen Name')):
-                m['combat'] = {'name': text_of(T, i, 'Screen Name'), 'description': text_of(T, i, 'Description')}
+                m['combat'] = {'name': text_of(T, i, 'Screen Name'), 'description': text_of(T, i, 'Description'),
+                               'key': re.sub(r'@NAME$', '', msgid(fields(game.node(i)).get('Screen Name')) or '').split('@')[-1].lower()}
                 break
         else:
             warn.append('%s: no combat enchantment' % key)

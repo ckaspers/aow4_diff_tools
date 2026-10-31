@@ -36,7 +36,7 @@ python aow4diff.py after-update
 
 For an aow4db-style website, once the patched game has made a new DUMPALL dump (with the mod loaded) and
 it is copied into the site: double-click `update_site.bat`. It runs `abilities.py`, `alltexts.py`, `spawnsets.py`, `tmlicons.py`,
-`realmtraits.py`, `citytree.py` and `magicmaterials.py` in that order (see below). It is a separate step because the dump only exists after the
+`realmtraits.py`, `citytree.py`, `magicmaterials.py`, `ancientwonders.py`, `worldmap.py` and `spells.py` in that order (see below). It is a separate step because the dump only exists after the
 game has run.
 
 Steam updates the game in place, so the snapshot has to exist **before** an update arrives.
@@ -56,11 +56,14 @@ Other commands:
 | `python spawnsets.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | unit categories (summon spells' spawn chances) for the same website (see below) |
 | `python citytree.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | city tree links for the same website (see below) |
 | `python magicmaterials.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | magic material sets, texts and income for the same website (see below) |
+| `python worldmap.py --site PATH [--acp mod.acp \| --no-mod]` | Infestations, Landmarks and Cosmic Happenings for the same website, and their icons |
+| `python spells.py --site PATH [--acp mod.acp \| --no-mod]` | Spells and siege projects for the same website (run after `worldmap.py`, whose lists it links to) |
+| `python ancientwonders.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | Ancient Wonders for the same website: each wonder with its stories, options, combat enchantments and defenders, and the enchantments' icons (see below) |
 | `python clbicons.py find PATTERN` / `list LIBRARY [PATTERN]` / `export LIBRARY NAME OUT.png [--crop]` / `export-all LIBRARY FOLDER [PATTERN]` | icons from the game's content libraries (see below) |
 | `python hudimages.py find PATTERN` / `export PATTERN FOLDER` | images of the game's interface (HUD buttons, frames) by the names its UI gives them (see below) |
 
 Paths live in `config.json` (game folder, Mods folder, snapshots, reports, and `"site"` for
-`alltexts.py`, `spawnsets.py`, `citytree.py` and `magicmaterials.py`).
+`alltexts.py`, `spawnsets.py`, `citytree.py`, `magicmaterials.py` and `ancientwonders.py`).
 
 ## Setup on Windows
 
@@ -196,6 +199,10 @@ Run it after copying a new DUMPALL dump into the site. Give the site's folder wi
 picks another, `--no-mod` reads the game alone.
 
 ## Magic materials for a website
+
+`ancientwonders.py` writes `Data/GEN/AncientWonders.json` and the combat enchantment icons missing from `Icons/CombatEnchantments/`: each wonder's texts, income and rally units, and each of its
+stories with the event's texts, options (costs, rewards, the enchantments they add or remove, affinity checks), defenders and aftermath. The texts use the game's variant for when your leader enters;
+what only play decides is worded generally ("your Hero", "Hero Item") and marked in the site's event colour.
 
 `magicmaterials.py` writes `Data/GEN/MagicMaterials.json`: each magic material set with its bonus and
 how many materials it needs (a field the decoder hides at its default of 3, different ones unless the
