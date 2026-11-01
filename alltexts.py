@@ -426,16 +426,16 @@ class Texts:
     def stored(self, key, context=()):
         """{TAG>Field} or {TAG>AREA>Radius}: the field of the resource with that DataStoreTag, when it holds one
         clear number. Of several resources sharing the tag, the text's own; when nothing tells which they are versions
-        of one effect, and it shows all their values ("2/4" for an effect and its enhanced form, not one that may be
-        wrong)."""
+        of one effect, and it shows the lowest, as the game does until one applies to a unit (a Single Shot attack's
+        enhanced form uses a higher one)."""
         tag = key.strip('{}').split('>')[0]
         rid = self.tagged(tag, context)
         v = self.stored_in(rid, key) if rid else None
         if v is not None: return v
         vals = {self.stored_in(r, key) for r in self.tagged_all(tag)} - {None}
-        # no list with a zero or a -1, "forever" (a summon's Turns To Live, a dispel's Num Things To Dispel)
+        # not a zero or a -1, "forever" (a summon's Turns To Live, a dispel's Num Things To Dispel)
         if len(vals) > 1: vals = {v for v in vals if int(v) > 0} or vals
-        return '/'.join(sorted(vals, key=lambda v: abs(int(v)))) or None
+        return min(vals, key=lambda v: abs(int(v))) if vals else None
 
     def stored_in(self, rid, key):
         path = key.strip('{}')

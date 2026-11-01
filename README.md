@@ -136,7 +136,7 @@ it no longer has are kept, as pages may still look them up.
   text's resources link to (Chaos Pulse reaches its Insanity four links on). The tag can be on an object
   inside a resource, and a text link can type the path in (`{hex}` = `{CHAOS_PULSE_CIRCLE_TARGETER>AREA>Radius}`).
   Several resources can share a tag (three hold `STUNNED_EFFECT_DESCRIPTION`, one with 6 turns); when nothing
-  tells which is meant the text shows all their values, "2/4" (an effect and its enhanced form). A field left
+  tells which is meant the text shows the lowest, as the game does until one applies to a unit (a Single Shot attack's enhanced form uses a higher one). A field left
   at its default is not written: its default comes from the schema (`Num Turns` 1). Fields go by another name
   in the editor (`STORED_AS`: `MaxDistance` is Max Jump Distance, `Regen` Hit points regeneration), and
   `Resolved...` is a percentage without its sign, which the text writes: Multiplier 1.1 is 10, 0.75 is 25,

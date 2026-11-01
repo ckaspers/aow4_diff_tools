@@ -6,7 +6,7 @@ Writes Data/GEN/SpellBook.json and Relics.json, and the icons of what the dump l
 The site folder is --site, else config.json's "site"; the mod is --acp, else the first .acp in the Mods folder.
 
 Costs, categories, where a spell comes from and DLCs are the live game's. Texts are the dump's (Data/EN/Spells.json): the
-game fills in its own values there, where alltexts.Texts can only list all a shared tag holds ("30/60/90%"); only what the
+game fills in its own values there, where alltexts.Texts can only give the lowest a shared tag holds; only what the
 dump leaves out, or a value it lost ("a -hex radius"), is filled here.
 
     spells   key, id, name, variant (of spells sharing an id, what tells them apart), page, tabs, type, tactical, cost and
