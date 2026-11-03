@@ -111,6 +111,15 @@ class Sources:
             for n, group in refs(f.get('Group Link')):
                 if group in self.tomes:
                     for m, sub in refs(f.get('Sub Skills')): self.tome_of_sub[sub].append(self.tomes[group])
+        # a skill outside the tome's grid that needs a property one of its skills gives is the tome's too: Pirate Bond's
+        # six captains, each unlocked by the tome's Conjure Pirate Captain and a House Trade with that captain
+        tome_of_prop = {p: tomes for sub, tomes in self.tome_of_sub.items()
+                        for n, p in refs(fields(game.node(sub)).get('Side Properties'))}
+        for rid in game.of_class('TGridSkill'):
+            f = fields(game.node(rid))
+            if any(group in self.tomes for n, group in refs(f.get('Group Link'))): continue
+            for n, p in refs(f.get('Required Side Properties')):
+                for m, sub in refs(f.get('Sub Skills')): self.tome_of_sub[sub].extend(tome_of_prop.get(p, []))
         # the structure whose threshold bonus it is
         self.landmark = {}
         for rid in game.of_class('TStructureR'):
