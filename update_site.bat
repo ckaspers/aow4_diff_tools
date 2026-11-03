@@ -1,5 +1,5 @@
 @echo off
-rem After a new DUMPALL dump is copied into the website: its texts, unit categories, city tree, magic materials, ancient wonders, world map sites and spells, from the
+rem After a new DUMPALL dump is copied into the website: its texts, unit categories, city tree, magic materials, ancient wonders, world map sites, spells and Architect attacks, from the
 rem live game with the mod. In this order: alltexts.py leaves the abilities abilities.py writes out of the concept
 rem tooltips.
 cd /d "%~dp0"
@@ -15,6 +15,7 @@ where py >nul 2>nul && set PY=py -3
 %PY% ancientwonders.py || goto failed
 %PY% worldmap.py || goto failed
 %PY% spells.py || goto failed
+%PY% affinityattacks.py || goto failed
 echo.
 echo Done: look over the changes in the website's folder before committing them.
 pause
