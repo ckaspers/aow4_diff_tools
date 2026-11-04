@@ -151,7 +151,11 @@ icon, the wording of its Hyperlink and its Description, links kept (with Selecta
 a tooltip on top of a tooltip, as the game does). Concepts the game no longer has are kept. A link to a
 property, structure, special operation... gets the resource's Screen Name and description, and its icon as
 `image` (the icon resource's id), exported to `Icons/UnitIcons/<id>.png` as `abilities.py` exports an
-ability's: 346 of the 424 have one (a unit's icon is drawn from its model).
+ability's: 346 of the 424 have one (a unit's icon is drawn from its model). Of several resources sharing the
+tag, the first is taken, unless its description links to the tag itself: the Curse of the Damned spell's "Target
+province gains Curse of the Damned" says nothing, so its province property's text is used ("Units in this
+province: ..."); Treacherous Reflection's likewise. One that links to itself stays when no other says more (Song of
+the Winds).
 
 `--dry-run` reports what would change and writes nothing. It takes about a minute.
 

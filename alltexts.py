@@ -634,14 +634,26 @@ def build_grouped(texts_of, texts, out, site, libraries, write_icons=True):
     made, icons = 0, 0
     for key in sorted(linked):
         group, tag = key.split('.')[1:]
-        rid = next(iter(texts_of.tagged_all(tag)), None)
+        tagged = texts_of.tagged_all(tag)
+        rid = next(iter(tagged), None)
         if not rid: continue
         name = texts_of.link_text(rid, 'Screen Name', 'Name', 'Title String', 'ScreenName')
         if not name: continue
+        description = texts_of.link_text(rid, *DESCRIPTION_FIELDS) or ''
+        # a text that links to itself says nothing: the Curse of the Damned spell's "Target province gains [hyperlink,
+        # ...CURSE_OF_THE_DAMNED]". Then another resource with the tag that does say what it is, its province property
+        # ("Units in this province: ..."). Kept when there is none (Song of the Winds, as in the game)
+        self_link = '[hyperlink,%s]' % key
+        if self_link in description:
+            for other in tagged[1:]:
+                text = texts_of.link_text(other, *DESCRIPTION_FIELDS) or ''
+                other_name = texts_of.link_text(other, 'Screen Name', 'Name', 'Title String', 'ScreenName')
+                if other_name and text.strip() and self_link not in text:
+                    rid, name, description = other, other_name, text
+                    break
         # without the icon of its kind: "[conduit/] Altar of Marching Gloom" is the Altar of Marching Gloom
         name = plain_name(re.sub(r'<[^>]+>|\[/?hyperlink[^\]]*\]|\[\w+/\]', '', name))
         if not name or name.lower() in abilities: continue
-        description = texts_of.link_text(rid, *DESCRIPTION_FIELDS) or ''
         description = site_markup(description).replace('\0', '<eventColor>{').replace('\1', '}</eventColor>')
         if not description.strip(): continue
         out[key] = {'name': name, 'icon': None, 'globalName': key, 'displayHtml': name, 'description': description}
