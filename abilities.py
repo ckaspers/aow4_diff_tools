@@ -10,7 +10,11 @@ Data/EN/Abilities.json has it, to Data/GEN/LinkedAbilities.json, and its icon to
 
     name, slug (the ability's id), description, damage ("18<damagefire></damagefire> "), accuracy ("100%", "Always
     Hits"), range, actionPoints ("<singleuseaction></singleuseaction>"), requisites, notes (cooldown, once per
-    battle, Zone of Control, line of sight), modifiers (none), icon
+    battle, Zone of Control, line of sight), modifiers (none), icon, tags (the DataStoreTags texts link it by)
+
+A dump passive may share the ability's name (the Seamare's Water Shift gives the Water Shift ability on Ocean; Fire
+Hex is the status the Fire Hex ability inflicts): the ability is still written, and its tags tell the website which
+of the two a link means.
 
 An ability is a TAbilityProperty; linked means a game text names its DataStoreTag ({GLOBAL.PROPERTIES.<tag>...}).
 Texts are filled in as all.json's are (alltexts.Texts). Run it before alltexts.py, which leaves these abilities out of
@@ -177,13 +181,18 @@ def main():
     dump = json.load(open(os.path.join(site, 'Data', 'EN', 'Abilities.json'), encoding='utf-8-sig'))
     if args.check: return check(abilities, dump)
 
-    dumped = {a['name'].split('^')[0].strip().lower() for a in dump if a.get('name')}
+    # the dump's active abilities by name: a passive of the same name is another thing (the Seamare's Water Shift, which
+    # gives the Water Shift ability on Ocean; Fire Hex, the status the Fire Hex ability inflicts)
+    dumped = {a['name'].split('^')[0].strip().lower() for a in dump if a.get('name') and a.get('actionPoints')}
     tags = linked_tags(T.T)
     entries = {}
     for rid in game.of_class('TAbilityProperty'):
-        if value(fields(game.node(rid)).get('DataStoreTag')) not in tags: continue
+        tag = value(fields(game.node(rid)).get('DataStoreTag'))
+        if tag not in tags: continue
         e = abilities.entry(rid)
-        if e['name'] and e['name'].lower() not in dumped: entries.setdefault(e['name'], e)
+        if e['name'] and e['name'].lower() not in dumped:
+            entries.setdefault(e['name'], dict(e, tags=[]))['tags'].append(tag)
+    for e in entries.values(): e['tags'] = sorted(set(e['tags']))
     entries = sorted(entries.values(), key=lambda e: e['name'])
     libraries, icons = icon_images(cfg), 0
     for e in entries:
