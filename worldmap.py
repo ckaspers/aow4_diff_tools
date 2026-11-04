@@ -21,7 +21,7 @@ Pictures aren't in the game's readable icon libraries: the site's own are found 
 """
 import argparse, datetime, json, os, re, struct, sys
 
-import aow4diff, alltexts, tooltips
+import aow4diff, alltexts, bc7, clbicons, tmlicons, tooltips
 from ancientwonders import Effects, GameIcons, Story, WORDS, bare, text_of as aw_text, unit_pools
 from citytree import Game, fields, refs, names, value, tags, msgid, hexid, units_needing
 
@@ -201,12 +201,60 @@ def oceanic_events(game, T, rid, rows, needed_by, warn):
             E.block(fields(bf.get('Script')).get('Actions'))
             units = list(dict.fromkeys(u['id'] for i in E.adds for u in sorted(needed_by.get(i, []), key=lambda u: int(u['tier']))))
             all_units += units
-            options.append({'text': UNIT_WORD.sub(r'', S.text(bf['Text Button'])), 'costs': E.costs, 'rewards': E.rewards, 'units': units})
-        if text or options: out.append({'label': label, 'text': [UNIT_WORD.sub(r'', t) for t in text], 'options': options})
+            options.append({'text': UNIT_WORD.sub(r'\1\2', S.text(bf['Text Button'])), 'costs': E.costs, 'rewards': E.rewards, 'units': units})
+        if text or options: out.append({'label': label, 'text': [UNIT_WORD.sub(r'\1\2', t) for t in text], 'options': options})
     return out, list(dict.fromkeys(all_units))
 
 
-def happenings(game, T, icons, site, warn):
+# a scene modifier's texture: [INTERFACEASSETS_SILVERSEAS]TX1\5, then the length and name of the file it was made from
+PICTURE = re.compile(rb'\[([A-Z0-9_]+)\]TX1.\d+.\x00\x00\x00([^\x00]+?\.png)', re.S)
+
+
+class Pictures:
+    """the picture an event shows, by its Story tags: a scene modifier set (TGCMModifierSet, Events_Scenes.rpk) whose
+    Tag Filter names the tag sets the event's background to a texture of an interface library (Mating Season's events,
+    OH_NimuMatingSeason: Happening_Oceanic_MatingSeason_[DIFF_DXT1].png in INTERFACEASSETS_SILVERSEAS). Written as a PNG
+    half the texture's size (512px of 1024: the cards show 240px), once: one already on the site is kept"""
+    def __init__(self, game):
+        self.libs = {tmlicons.library_name(p): p for p in clbicons.libraries(game.cfg['game'])}
+        self.of_tag = {}
+        for r in game.of_class('TGCMModifierSet'):
+            m = PICTURE.search(game.raw[r])
+            if not m: continue
+            for t in re.findall(r"Contains '([^']+)'", str(game.node(r))):
+                self.of_tag.setdefault(t, (m.group(1).decode(), m.group(2).decode()))
+
+    def write(self, story_tags, folder, key):
+        out = os.path.join(folder, key + '.png')
+        if os.path.exists(out): return key + '.png'
+        lib_name, filename = next((self.of_tag[t] for t in story_tags if t in self.of_tag), (None, None))
+        if lib_name not in self.libs: return None
+        lib = clbicons.Library(self.libs[lib_name])
+        tex = lib.texture_from(filename)
+        if not tex: return None
+        data, w, h = lib.pixels(tex), tex['width'], tex['height']
+        if tex['format'] == bc7.BC1: rgba = bc7.decode_bc1(data, w, h)
+        elif tex['format'] == clbicons.RGBA: rgba = data[:w * h * 4]
+        else: return None
+        clbicons.write_png(out, w // 2, h // 2, half(w, h, rgba))
+        return key + '.png'
+
+
+def half(w, h, rgba):
+    """RGBA bytes at half the width and height, each pixel the mean of four"""
+    out = bytearray((w // 2) * (h // 2) * 4)
+    row = w * 4
+    for y in range(h // 2):
+        a, b, o = 2 * y * row, (2 * y + 1) * row, y * (w // 2) * 4
+        for x in range(w // 2):
+            i, j = a + 8 * x, b + 8 * x
+            for c in range(4):
+                out[o + c] = (rgba[i + c] + rgba[i + 4 + c] + rgba[j + c] + rgba[j + 4 + c] + 2) // 4
+            o += 4
+    return bytes(out)
+
+
+def happenings(game, T, icons, pictures, site, warn):
     old = json.load(open(os.path.join(site, 'Data', 'GEN', 'CosmicHappenings.json'), encoding='utf-8-sig'))
     image_of = {e['extraLookup']: e['image'] for e in old if e.get('extraLookup')}
     # the Major ones have no text id there: by name, without its affinity
@@ -257,7 +305,12 @@ def happenings(game, T, icons, site, warn):
                 worded = lambda t: UNIT_WORD.sub(r'\1\2', t)
                 e['story'] = {'text': [worded(p) for p in parts if p],
                               'options': [worded(S.text(fields(b)['Text Button'])) for b in (buttons[1] if buttons and buttons[0] == 'l' else [])]}
-        if group == 'Oceanic': e['events'], e['units'] = oceanic_events(game, T, rid, rows, needed_by, warn)
+        if group == 'Oceanic':
+            e['events'], e['units'] = oceanic_events(game, T, rid, rows, needed_by, warn)
+            # its picture, which upstream's lists don't have: the one its events show
+            story_tags = [t for r in rows for n, i in refs(r.get('Story Events')) if i in game.raw for t in tags(fields(game.node(i)).get('Story tags'))]
+            e['image'] = pictures.write(story_tags, folder, 'image_' + e['key'])
+            if not e['image']: warn.append('%s: no picture' % name)
         got[name] = e
     order = {g: i for i, g in enumerate(('Minor', 'Major', 'Intrigue', 'Special', 'Oceanic'))}
     return sorted(got.values(), key=lambda e: (order[e['group']], e['category'], key_of(e['name'])))
@@ -284,7 +337,7 @@ def main():
             'mod': os.path.splitext(os.path.basename(acp))[0] if acp else None}
     for name, key, rows in (('Infestations', 'infestations', infestations(game, T, texts, site, warn)),
                             ('Landmarks', 'landmarks', landmarks(game, T, icons, site, warn)),
-                            ('Happenings', 'happenings', happenings(game, T, icons, site, warn))):
+                            ('Happenings', 'happenings', happenings(game, T, icons, Pictures(game), site, warn))):
         out = os.path.join(site, 'Data', 'GEN', name + '.json')
         with open(out, 'w', encoding='utf-8', newline='\n') as f:
             json.dump({**head, key: rows}, f, indent=1, ensure_ascii=False)

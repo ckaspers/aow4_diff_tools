@@ -1,6 +1,7 @@
 """BC7 texture blocks to RGBA, standard library only: the game's text icon atlases (TML_Icons.clb) are BC7.
 
     rgba = bc7.decode(data, width, height, x, y, w, h)    the w x h pixels at x, y, 4 bytes each
+    rgba = bc7.decode_bc1(data, width, height)            a whole BC1 (DXT1, format 131) texture: the event pictures
 
 Only the 4x4 blocks under the asked area are decoded, so a small icon out of a large atlas is quick. A block is 16
 bytes, least significant bit first; the lowest set bit of its first byte is its mode (0-7). The mode decides how
@@ -94,6 +95,33 @@ def block(b):
         if rot: px[rot - 1], px[3] = px[3], px[rot - 1]
         out.append(tuple(px))
     return out
+
+
+BC1 = 131    # the texture format number of BC1 (DXT1)
+
+
+def decode_bc1(data, width, height):
+    """RGBA bytes of a BC1 (DXT1) texture: 8 bytes a 4x4 block, two RGB565 colours and 2 bits a pixel. The first colour
+    greater than the second: two more at 1/3 and 2/3 between; else one halfway and transparent black"""
+    out = bytearray(width * height * 4)
+    bw = (width + 3) // 4
+    rgb = lambda c: ((c >> 11 & 31) * 255 // 31, (c >> 5 & 63) * 255 // 63, (c & 31) * 255 // 31)
+    for k in range(0, min(len(data), bw * ((height + 3) // 4) * 8), 8):
+        c0, c1 = data[k] | data[k + 1] << 8, data[k + 2] | data[k + 3] << 8
+        a, b = rgb(c0), rgb(c1)
+        if c0 > c1:
+            pal = [a + (255,), b + (255,), tuple((2 * x + y) // 3 for x, y in zip(a, b)) + (255,),
+                   tuple((x + 2 * y) // 3 for x, y in zip(a, b)) + (255,)]
+        else:
+            pal = [a + (255,), b + (255,), tuple((x + y) // 2 for x, y in zip(a, b)) + (255,), (0, 0, 0, 0)]
+        bits = data[k + 4] | data[k + 5] << 8 | data[k + 6] << 16 | data[k + 7] << 24
+        bx, by = (k // 8) % bw * 4, (k // 8) // bw * 4
+        for i in range(16):
+            ix, iy = bx + (i & 3), by + (i >> 2)
+            if ix < width and iy < height:
+                o = (iy * width + ix) * 4
+                out[o:o + 4] = bytes(pal[bits >> 2 * i & 3])
+    return bytes(out)
 
 
 def decode(data, width, height, x=0, y=0, w=None, h=None):

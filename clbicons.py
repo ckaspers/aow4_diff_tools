@@ -22,6 +22,7 @@ The format, as far as it is needed here (checked on all 876 libraries of the gam
     image    a record naming the image, its texture nested a little after; its smaller copies follow as a
              list of textures, each with its class id 41 00 24 in front
 Icon images are 8-bit RGBA; their smaller copies and other textures are block-compressed, not handled here.
+Library.texture_from finds any texture by the file it was made from (an event picture, BC1: bc7.decode_bc1).
 """
 import argparse, json, os, re, struct, sys, zlib
 
@@ -74,6 +75,32 @@ class Library:
                 if 0 < length < 200 and (name := self.string(length, offset)) and re.fullmatch(r'[\w .\-]+', name): break
                 name = None
             yield name or '?', tex
+
+    def texture_from(self, filename):
+        """the texture made from a source file (its record names the file, "Happening_Oceanic_MatingSeason_[DIFF_DXT1].png",
+        the end of a path in the string table; the texture's record follows), whatever its format: width, height,
+        format, offset, storage, size, stored; None if the library has no such file"""
+        h = struct.unpack_from('<6I', self.head)
+        strings, base = self.head[0x20:0x20 + h[3]], 0x20 + h[3]
+        recs = self.head[base:base + h[4]]
+        for m in re.finditer(rb'[^\x00]+', strings):
+            path = m.group(0).decode(errors='replace')
+            if path.replace(chr(92), '/').split('/')[-1] != filename: continue
+            at = recs.find(struct.pack('<II', len(m.group(0)), m.start()))
+            if at < 0: continue
+            for mt in TABLE.finditer(self.head, base + at, self.data):
+                k = mt.group(1)[0]
+                pairs = mt.group(2)[:2 * k]
+                fids, offs = pairs[0::2], pairs[1::2]
+                if not {0x14, 0x15, 0x16} <= set(fids) or offs[0] != 0: continue
+                body = mt.end(1) + 2 * k
+                f = dict(zip(fids, offs))
+                tex = {'width': struct.unpack_from('<I', self.head, body + f[0x14])[0],
+                       'height': struct.unpack_from('<I', self.head, body + f[0x15])[0],
+                       'format': struct.unpack_from('<I', self.head, body + f[0x17])[0] if 0x17 in f else None}
+                tex['offset'], tex['storage'], tex['size'], tex['stored'] = struct.unpack_from('<4I', self.head, body + f[0x16])
+                return tex
+        return None
 
     def pixels(self, tex):
         with open(self.path, 'rb') as f:
