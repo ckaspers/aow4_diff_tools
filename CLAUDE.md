@@ -101,6 +101,7 @@ same two as floats). These are read by size: `guess` takes a stored 1 for a list
   Checked against all 171 such properties (raw search): the rest come from tomes, landmarks and wonders, which the site
   already lists; the Silver Seas' Oceanic happenings' outro events (Mating Season: Seamare, Nimu, Kraken...); story
   realm scripts; or nothing. Beast Trainer and Friend of Ogres (`THeroTraitProperty`) grant some but nothing gives them.
+  `UNUSED_UNITS` (from the maintainer): units a structure unlocks that no player can get (the Shipyard's Ram Warship).
 - Culture, sub-culture and Throne icons are not in the DUMPALL export. `TGameIconR` points into a
   texture atlas in `Content/Title/Libraries/Icons/*.clb` (KTX/BC7 entries named after the source
   .png); nothing reads those yet.

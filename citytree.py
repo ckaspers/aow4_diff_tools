@@ -365,10 +365,16 @@ def build(game, site):
             'structures': out}, warn, B
 
 
+# what the data doesn't tell, from the maintainer: units no player can get, though a structure still unlocks them
+UNUSED_UNITS = {'ram_warship': 'Not in use (the Shipyard unlocks it)', 'ballista_warship': 'Not in use (the Grand Wharf unlocks it)'}
+
+
 def units_needing(game, site):
     """{property id: [units]}: a unit's Required Structure Properties names the properties that let a city draft it, any one
-    of them, which a structure, a society trait or an artifact grants (Clay Forge grants "Clay Arbalest - Structure Property")"""
-    unit_of = {hexid(u['resid']): u for u in json.load(open(os.path.join(site, 'Data', 'EN', 'Units.json'), encoding='utf-8-sig'))}
+    of them, which a structure, a society trait or an artifact grants (Clay Forge grants "Clay Arbalest - Structure Property").
+    UNUSED_UNITS are left out"""
+    unit_of = {hexid(u['resid']): u for u in json.load(open(os.path.join(site, 'Data', 'EN', 'Units.json'), encoding='utf-8-sig'))
+               if u['id'] not in UNUSED_UNITS}
     needed_by = {}
     for r in game.of_class('TBaseUnitR'):
         if r not in unit_of: continue
@@ -388,7 +394,7 @@ def structure_extras(game, site):
             effects it predicts (Merchants' Guild)
     help    {resid: msgid} of their Help Text, the yellow line at the foot of the tooltip ("Use mana to cast Spells")
     units   {resid: [unit ids]} of the structures that unlock units (units_needing): province improvements in their Colony
-            Properties, city structures too (Shipyard: Ram Warship). What every city gets from its Town Hall or Throne is
+            Properties, city structures too (Vampire Castle: Soul Forge's bats). What every city gets from its Town Hall or Throne is
             no unlock: Tier 1 - Unit Production (the culture's units) and the walls' siege towers"""
     dump = json.load(open(os.path.join(site, 'Data', 'EN', 'StructureUpgrades.json'), encoding='utf-8-sig'))
     needed_by = units_needing(game, site)
