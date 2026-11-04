@@ -25,7 +25,7 @@ import argparse, bisect, collections, datetime, json, os, re, struct, sys
 
 import aow4diff, alltexts, stale, tooltips
 from ancientwonders import GameIcons, text_of
-from citytree import Game, fields, refs, names, value, msgid, hexid
+from citytree import Game, fields, refs, names, value, msgid, hexid, units_needing, units_of
 from worldmap import dlc_of, key_of
 
 SPELL_CLASSES = ('TCombatSpecialOperationR', 'TSustainedSpecialOperationR', 'TInstantSpecialOperationR',
@@ -395,8 +395,10 @@ def unit_sites(site):
 
 
 def artifacts(game, T, site, dump, warn):
-    """Data/GEN/Relics.json as the site reads it, with the game's names and the spells each unlocks; the ids and pictures stay
+    """Data/GEN/Relics.json as the site reads it, with the game's names, the spells each unlocks and the units it lets cities
+    draft (unit_unlock: Heart of the Maer's Ghost Ship, Nimue's Secret Scroll's Direcaster); the ids and pictures stay
     upstream's, found by text id"""
+    needed_by = units_needing(game, site)
     old = {e['extraLookup']: e for e in json.load(open(os.path.join(site, 'Data', 'GEN', 'Relics.json'), encoding='utf-8-sig'))}
     spells_of = collections.defaultdict(list)
     for rid, s in dump.items():
@@ -413,8 +415,11 @@ def artifacts(game, T, site, dump, warn):
             warn.append('%s: an artifact the site has no picture for' % name)
             continue
         spells = list(dict.fromkeys(i for n, p in refs(f.get('Properties')) for i in spells_of.get(p, [])))
-        out[text] = {**e, 'name': alltexts.plain_name(text_of(T, rid, 'Screen Name')), **({'spell': [{'id': i} for i in spells]} if spells else {})}
+        units = units_of([p for n, p in refs(f.get('Properties'))], needed_by)
+        out[text] = {**e, 'name': alltexts.plain_name(text_of(T, rid, 'Screen Name')), **({'spell': [{'id': i} for i in spells]} if spells else {}),
+                     **({'unit_unlock': [{'id': i} for i in units]} if units else {})}
         if not spells: out[text].pop('spell', None)
+        if not units: out[text].pop('unit_unlock', None)
     for text, e in old.items():
         if text not in out: warn.append('%s: in the list, not in the game' % e['name'])
     return [out[t] for t in old if t in out]

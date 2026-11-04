@@ -194,6 +194,8 @@ dump's abilities of the same name. Run it before `alltexts.py`, which then write
 follows which, which culture, sub-culture or tome it belongs to, and the Town Hall tier it needs, read
 from the live game with the mod on top. It holds only links (resource ids, culture keys and text ids);
 the site's own `StructureUpgrades.json`, `Tomes.json` and `all.json` supply names, icons and texts.
+Beside it, `StructurePredictions.json` holds what the dump leaves out of structures (Show Prediction off, Help Text)
+and the units that structures (`units`, by resid), society traits (`traits`) and hero skills (`skills`) let cities draft.
 
 Run it after copying a new DUMPALL dump into the site. Give the site's folder with `--site`, or set
 `"site"` in `config.json`. It reads the first mod in your Mods folder on top of the game; `--acp`

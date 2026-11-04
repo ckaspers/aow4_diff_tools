@@ -5,8 +5,8 @@ sub-culture or tome it belongs to, read from the live game, with a mod on top if
 
 Run it after copying a new DUMPALL dump into the website: it reads the site's
 Data/EN/StructureUpgrades.json and Data/EN/Tomes.json, and writes Data/GEN/CityTreeLinks.json, and beside
-it StructurePredictions.json: the resids of every structure whose Show Prediction is off, each one's Help Text, and the
-units each province improvement unlocks.
+it StructurePredictions.json: the resids of every structure whose Show Prediction is off, each one's Help Text, the
+units each structure unlocks, and those each society trait (traits, by the dump's trait id) and hero skill (skills) unlocks.
 The site folder is --site, else config.json's "site". The mod is --acp, else the first .acp in the
 Mods folder; --no-mod (or no mod installed) reads the game alone.
 
@@ -365,20 +365,36 @@ def build(game, site):
             'structures': out}, warn, B
 
 
-def structure_extras(game, site):
-    """what the dump leaves out of every structure (sector upgrades too):
-    hidden  resids of those whose Show Prediction is off: the game shows their description alone, without the
-            effects it predicts (Merchants' Guild)
-    help    {resid: msgid} of their Help Text, the yellow line at the foot of the tooltip ("Use mana to cast Spells")
-    units   {resid: [unit ids]} of the province improvements that unlock units, by tier: a unit's Required Structure
-            Properties names properties these improvements grant in their Colony Properties (Clay Forge grants
-            "Clay Arbalest - Structure Property"); a unit needs any one of them"""
-    dump = json.load(open(os.path.join(site, 'Data', 'EN', 'StructureUpgrades.json'), encoding='utf-8-sig'))
+def units_needing(game, site):
+    """{property id: [units]}: a unit's Required Structure Properties names the properties that let a city draft it, any one
+    of them, which a structure, a society trait or an artifact grants (Clay Forge grants "Clay Arbalest - Structure Property")"""
     unit_of = {hexid(u['resid']): u for u in json.load(open(os.path.join(site, 'Data', 'EN', 'Units.json'), encoding='utf-8-sig'))}
     needed_by = {}
     for r in game.of_class('TBaseUnitR'):
         if r not in unit_of: continue
         for n, i in refs(fields(game.node(r)).get('Required Structure Properties')): needed_by.setdefault(i, []).append(unit_of[r])
+    return needed_by
+
+
+def units_of(props, needed_by):
+    """the ids of the units the properties unlock, by tier"""
+    us = {u['id']: u for i in props for u in needed_by.get(i, [])}
+    return [u['id'] for u in sorted(us.values(), key=lambda u: int(u['tier']))]
+
+
+def structure_extras(game, site):
+    """what the dump leaves out of every structure (sector upgrades too):
+    hidden  resids of those whose Show Prediction is off: the game shows their description alone, without the
+            effects it predicts (Merchants' Guild)
+    help    {resid: msgid} of their Help Text, the yellow line at the foot of the tooltip ("Use mana to cast Spells")
+    units   {resid: [unit ids]} of the structures that unlock units (units_needing): province improvements in their Colony
+            Properties, city structures too (Shipyard: Ram Warship). What every city gets from its Town Hall or Throne is
+            no unlock: Tier 1 - Unit Production (the culture's units) and the walls' siege towers"""
+    dump = json.load(open(os.path.join(site, 'Data', 'EN', 'StructureUpgrades.json'), encoding='utf-8-sig'))
+    needed_by = units_needing(game, site)
+    granted = lambda f: [i for n, i in refs(f.get('Colony Properties')) + refs(f.get('Structure Properties'))]
+    every_city = {i for r in game.of_class('TStructureUpgradeR') if re.match(r'Town Hall|Throne City', game.name(r))
+                  for i in granted(fields(game.node(r)))}
     hidden, help_texts, unlocks = set(), {}, {}
     for e in dump:
         rid = hexid(e['resid'])
@@ -386,12 +402,37 @@ def structure_extras(game, site):
         f = fields(game.node(rid))
         if value(f.get('Show Prediction')) == 'false': hidden.add(str(e['resid']))
         if msgid(f.get('Help Text')): help_texts[str(e['resid'])] = msgid(f.get('Help Text'))
-        if value(f.get('IsSectorImprovement')) == 'true':
-            us = {u['id']: u for n, i in refs(f.get('Colony Properties')) + refs(f.get('Structure Properties'))
-                  for u in needed_by.get(i, [])}
-            if us: unlocks[str(e['resid'])] = [u['id'] for u in sorted(us.values(), key=lambda u: int(u['tier']))]
+        us = units_of([i for i in granted(f) if i not in every_city], needed_by)
+        if us: unlocks[str(e['resid'])] = us
     return (sorted(hidden, key=int), dict(sorted(help_texts.items(), key=lambda x: int(x[0]))),
             dict(sorted(unlocks.items(), key=lambda x: int(x[0]))))
+
+
+def trait_units(game, site):
+    """{trait id: [unit ids]} of the society traits that unlock units, by their Side and Colony Properties (Tidecallers:
+    "Structure Prop - Tidecallers", which water units need). The dump's trait is found by its icon"""
+    needed_by = units_needing(game, site)
+    by_icon = {t['icon']: t['id'] for t in json.load(open(os.path.join(site, 'Data', 'EN', 'Traits.json'), encoding='utf-8-sig'))}
+    out = {}
+    for r in game.of_class('TRaceTrait'):
+        f = fields(game.node(r))
+        icon = (refs(f.get('Icon Link')) or [(None, None)])[0][1]
+        us = units_of([i for k in ('Side Properties', 'Colony Properties', 'RaceProperties') for n, i in refs(f.get(k))], needed_by)
+        if us and icon in by_icon: out[by_icon[icon]] = us
+    return dict(sorted(out.items()))
+
+
+def skill_units(game, site):
+    """{hero skill id: [unit ids]} of the hero skills whose Side Properties let the empire's cities draft units (Ascension:
+    Living Spider Nest's five spiders, Rosebound Noble's Rose Knight), found in the dump by resid"""
+    needed_by = units_needing(game, site)
+    out = {}
+    for s in json.load(open(os.path.join(site, 'Data', 'EN', 'HeroSkills.json'), encoding='utf-8-sig')):
+        rid = hexid(s['resid'])
+        if rid not in game.raw: continue
+        us = units_of([i for n, i in refs(fields(game.node(rid)).get('Side Properties'))], needed_by)
+        if us: out[s['id']] = us
+    return dict(sorted(out.items()))
 
 
 def main():
@@ -420,13 +461,14 @@ def main():
     for w in dict.fromkeys(warn): print('  warning:', w)
 
     hidden, help_texts, unlocks = structure_extras(game, site)
+    traits, skills = trait_units(game, site), skill_units(game, site)
     pred = os.path.join(os.path.dirname(out), 'StructurePredictions.json')
     with open(pred, 'w', encoding='utf-8', newline='\n') as f:
-        json.dump({k: data[k] for k in ('generated', 'build', 'mod')} | {'hidden': hidden, 'help': help_texts, 'units': unlocks},
-                  f, indent=1, ensure_ascii=False)
+        json.dump({k: data[k] for k in ('generated', 'build', 'mod')} | {'hidden': hidden, 'help': help_texts, 'units': unlocks,
+                                                                       'traits': traits, 'skills': skills}, f, indent=1, ensure_ascii=False)
         f.write('\n')
-    print('%d structures with Show Prediction off, %d with a help text, %d province improvements that unlock units -> %s'
-          % (len(hidden), len(help_texts), len(unlocks), pred))
+    print('%d structures with Show Prediction off, %d with a help text; units unlocked by %d structures, %d society traits, %d hero skills -> %s'
+          % (len(hidden), len(help_texts), len(unlocks), len(traits), len(skills), pred))
 
 
 if __name__ == '__main__':
