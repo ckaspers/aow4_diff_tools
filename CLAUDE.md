@@ -102,9 +102,6 @@ same two as floats). These are read by size: `guess` takes a stored 1 for a list
   already lists; the Silver Seas' Oceanic happenings' outro events (Mating Season: Seamare, Nimu, Kraken...); story
   realm scripts; or nothing. Beast Trainer and Friend of Ogres (`THeroTraitProperty`) grant some but nothing gives them.
   `UNUSED_UNITS` (from the maintainer): units a structure unlocks that no player can get (the Shipyard's Ram Warship).
-  `ONE_COPY_UNITS` (from the maintainer): units a player gets one of, though what gives them also grants the property their
-  recruitment needs (Frozen Seas' Ancient Hoarfrost Manta: the choice's tooltip names the Hoarfrost Manta alone). They are
-  no unlock; `units_needing(one_copy=True)` gives them alone, and a happening's choice lists them as `gains`.
 - Culture, sub-culture and Throne icons are not in the DUMPALL export. `TGameIconR` points into a
   texture atlas in `Content/Title/Libraries/Icons/*.clb` (KTX/BC7 entries named after the source
   .png); nothing reads those yet.
