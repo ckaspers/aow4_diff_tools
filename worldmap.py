@@ -169,24 +169,28 @@ def landmarks(game, T, icons, site, warn):
     return sorted(got.values(), key=lambda e: e['name'])
 
 
-# an Oceanic happening's story events by the end of their name; DEPRECATED ones are left out
-EVENT_LABEL = {'Prelude': 'Prelude', 'Intro': 'Beginning', 'Warning': 'Warning', 'Outro': 'End', '1st Prize': "The winner's prize",
-               'Participation Prize': "The others' prize"}
+# a happening's story events by the end of their name ("Minor Happening (Cosmic) - Astral Eclipse - Intro", "Blood Moon -
+# Intro Event"); DEPRECATED ones are left out
+EVENT_LABEL = {'Prelude': 'Prelude', 'Foreshadow': 'Foreshadowing', 'Foreshadowing': 'Foreshadowing', 'Intro': 'Beginning',
+               'Triggering': 'Beginning', 'Warning': 'Warning', 'Outro': 'End', 'Aftermath': 'End',
+               '1st Prize': "The winner's prize", 'Participation Prize': "The others' prize"}
 
 
-def oceanic_events(game, T, rid, rows, needed_by, warn):
-    """an Oceanic happening's story: the events its schedule shows, then those they or it hand on to (the prizes), found in
-    its own pack by their id in the raw data, as a script's links aren't decoded. Each option's costs, rewards and the units
-    the properties it adds let cities draft (Mating Season's Feed the Spawning Shoals: Nimu, Seamare...)"""
+def happening_events(game, T, rid, rows, needed_by, warn, follow=False):
+    """a happening's story: the events its schedule shows, each once, and with follow (the Oceanic ones) those they or it
+    hand on to (the prizes), found in its own pack by their id in the raw data, as a script's links aren't decoded; the
+    Cosmic ones share a pack, where a chance match would bring in another's. Each option's costs, rewards and the units the
+    properties it adds let cities draft (Mating Season's Feed the Spawning Shoals: Nimu, Seamare...)"""
     own = [e for e in game.of_class('TStoryEventResource') if game.pack[e] == game.pack[rid] and 'DEPRECATED' not in game.name(e)]
     def linked(x):
         raw = game.raw[x]
         return [e for e in own if e != x and struct.pack('<II', int(e[8:], 16), int(e[:8], 16)) in raw]
-    evs = [i for r in rows for n, i in refs(r.get('Story Events')) if i in own]
-    for x in [rid] + list(evs): evs += [e for e in linked(x) if e not in evs]
+    evs = list(dict.fromkeys(i for r in rows for n, i in refs(r.get('Story Events')) if i in game.raw and 'DEPRECATED' not in game.name(i)))
+    if follow:
+        for x in [rid] + list(evs): evs += [e for e in linked(x) if e not in evs]
     out, all_units = [], []
     for ev in evs:
-        label = EVENT_LABEL.get(game.name(ev).split(' - ')[-1].strip())
+        label = EVENT_LABEL.get(re.sub(r' Event$', '', game.name(ev).split(' - ')[-1].strip()))
         if not label:
             warn.append('%s: an event with no label' % game.name(ev))
             continue
@@ -206,6 +210,9 @@ def oceanic_events(game, T, rid, rows, needed_by, warn):
     return out, list(dict.fromkeys(all_units))
 
 
+# a happening's picture the game has but no resource links: Warped Seasons' own (its events show none; a story realm's
+# Warped Seasons event shows DLC10_Event_WarpedSeasons)
+UNLINKED_PICTURES = {'Warped Seasons': ('INTERFACEASSETS_SECRETSOFTHEARCHMAGES', 'Happening_WarpedSeasons_[DIFF_DXT1].png')}
 # a scene modifier's texture: [INTERFACEASSETS_SILVERSEAS]TX1\5, then the length and name of the file it was made from
 PICTURE = re.compile(rb'\[([A-Z0-9_]+)\]TX1.\d+.\x00\x00\x00([^\x00]+?\.png)', re.S)
 
@@ -224,10 +231,11 @@ class Pictures:
             for t in re.findall(r"Contains '([^']+)'", str(game.node(r))):
                 self.of_tag.setdefault(t, (m.group(1).decode(), m.group(2).decode()))
 
-    def write(self, story_tags, folder, key):
+    def write(self, story_tags, folder, key, unlinked=None):
+        """the picture of the first tag that has one, else unlinked: (library, file) the game has but links nowhere"""
         out = os.path.join(folder, key + '.png')
         if os.path.exists(out): return key + '.png'
-        lib_name, filename = next((self.of_tag[t] for t in story_tags if t in self.of_tag), (None, None))
+        lib_name, filename = next((self.of_tag[t] for t in story_tags if t in self.of_tag), unlinked or (None, None))
         if lib_name not in self.libs: return None
         lib = clbicons.Library(self.libs[lib_name])
         tex = lib.texture_from(filename)
@@ -260,7 +268,6 @@ def happenings(game, T, icons, pictures, site, warn):
     # the Major ones have no text id there: by name, without its affinity
     image_named = {key_of(re.sub(r'\(.*\)', '', e['name'])): e['image'] for e in old}
     folder = os.path.join(site, 'Icons', 'CosmicHappenings')
-    story_events = {e: game.name(e) for e in game.of_class('TStoryEventResource')}
     needed_by = units_needing(game, site)
     got = {}
     for rid in game.of_class('TScriptedWorldCrisisResource'):
@@ -305,12 +312,15 @@ def happenings(game, T, icons, pictures, site, warn):
                 worded = lambda t: UNIT_WORD.sub(r'\1\2', t)
                 e['story'] = {'text': [worded(p) for p in parts if p],
                               'options': [worded(S.text(fields(b)['Text Button'])) for b in (buttons[1] if buttons and buttons[0] == 'l' else [])]}
-        if group == 'Oceanic':
-            e['events'], e['units'] = oceanic_events(game, T, rid, rows, needed_by, warn)
-            # its picture, which upstream's lists don't have: the one its events show
-            story_tags = [t for r in rows for n, i in refs(r.get('Story Events')) if i in game.raw for t in tags(fields(game.node(i)).get('Story tags'))]
-            e['image'] = pictures.write(story_tags, folder, 'image_' + e['key'])
-            if not e['image']: warn.append('%s: no picture' % name)
+        # its events, each with its choices; an intrigue's are its opening event (above) and one random war event over and over
+        if group != 'Intrigue':
+            e['events'], e['units'] = happening_events(game, T, rid, rows, needed_by, warn, follow=group == 'Oceanic')
+        # its picture: the one its events show (or one the game has unlinked), else upstream's (Toll of Seasons); the
+        # intrigues and the Visions of Ruin's ages have none in the game, their events show where they happen
+        story_tags = [t for r in rows for n, i in refs(r.get('Story Events')) if i in game.raw for t in tags(fields(game.node(i)).get('Story tags'))]
+        upstream = e['image'] if e['image'] and os.path.exists(os.path.join(folder, e['image'])) else None
+        e['image'] = pictures.write(story_tags + tags(f.get('Tags')), folder, 'image_' + e['key'], UNLINKED_PICTURES.get(name)) or upstream
+        if not e['image'] and group == 'Oceanic': warn.append('%s: no picture' % name)
         got[name] = e
     order = {g: i for i, g in enumerate(('Minor', 'Major', 'Intrigue', 'Special', 'Oceanic'))}
     return sorted(got.values(), key=lambda e: (order[e['group']], e['category'], key_of(e['name'])))
