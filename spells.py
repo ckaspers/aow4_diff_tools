@@ -14,7 +14,7 @@ dump leaves out, or a value it lost ("a -hex radius"), is filled here.
     siege    key, id, name, tab, cost, damage, description, sources, tier, affinities, dlc, icon
     sources  kind (Tome, Magic Victory, Hero Skill, Artifact, Secret Spell, Ancient Wonder, Landmark, Cosmic Happening, City Structure,
              Culture, Trait, Ruler), name, and of a tome its id, tier, icon, affinities
-    sites    id, name, type, link, image, units: the wonders and landmarks that give units, for a unit's page
+    sites    id, name, type, link, image, units: the wonders, landmarks and Oceanic happenings that give units, for a unit's page
     left_out name, why: spells the game has and no one can get, which the old pages listed
 
 A spell is unlocked by a player property (Required Unlock Side Properties); the resources that hold the property's id are
@@ -372,7 +372,7 @@ def build(game, T, site, icons, warn):
 
 def unit_sites(site):
     """the wonders and landmarks that give units, for a unit's page, and Lava Prison's Primordials, its adventures' defenders,
-    which are to be had nowhere else"""
+    which are to be had nowhere else; and the Oceanic happenings whose choices unlock units (Mating Season's Seamare)"""
     read = lambda *p: json.load(open(os.path.join(site, *p), encoding='utf-8-sig'))
     ids_of = collections.defaultdict(list)
     for u in read('Data', 'EN', 'Units.json'):
@@ -391,6 +391,10 @@ def unit_sites(site):
             # the Leviathan's parts have neither
             image = 'StructurePics/%s.png' % l['picture'] if l['picture'] else 'WorldStructures/%s' % l['icon'] if l['icon'] else None
             out.append({'id': l['key'], 'name': l['name'], 'type': 'Landmark', 'link': 'Landmarks.html', 'image': image, 'units': l['units']})
+    for h in read('Data', 'GEN', 'Happenings.json')['happenings']:
+        if h.get('units'):
+            out.append({'id': h['key'], 'name': h['name'], 'type': 'Oceanic Happening', 'link': 'OceanicHappenings.html?type=%s&' % h['category'],
+                        'image': 'CosmicHappenings/%s' % h['icon'], 'units': h['units']})
     return out
 
 

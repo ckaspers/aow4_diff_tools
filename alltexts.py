@@ -395,11 +395,12 @@ class Texts:
         return '[hyperlink,GLOBAL.%s]%s[/hyperlink]' % (key, plain_name(name) if name else '{GLOBAL.%s}' % key)
 
     def grouped(self, group, tag, part):
-        """{GLOBAL.PROPERTIES.<tag>} and the like: the resource with that DataStoreTag, by its Screen Name"""
+        """{GLOBAL.PROPERTIES.<tag>} and the like: the resource with that DataStoreTag, by its Screen Name (a pickup's is
+        ScreenName: Mating Season's "Water egg pickup guarded" is an Egg)"""
         # named after the first of the resources with that tag: its own values only when it is the only one ("2 Extra
         # Retaliations" and "Extra Retaliation" share EXTRA_RETALIATION)
         found = self.tagged_all(tag)
-        name = next((n for n in (self.link_text(r, 'Screen Name', 'Name', 'Title String', own=len(found) == 1) for r in found)
+        name = next((n for n in (self.link_text(r, 'Screen Name', 'Name', 'Title String', 'ScreenName', own=len(found) == 1) for r in found)
                      if n is not None), None)
         if name is None:
             self.unresolved['GLOBAL.%s.%s' % (group, tag)] += 1
@@ -635,7 +636,7 @@ def build_grouped(texts_of, texts, out, site, libraries, write_icons=True):
         group, tag = key.split('.')[1:]
         rid = next(iter(texts_of.tagged_all(tag)), None)
         if not rid: continue
-        name = texts_of.link_text(rid, 'Screen Name', 'Name', 'Title String')
+        name = texts_of.link_text(rid, 'Screen Name', 'Name', 'Title String', 'ScreenName')
         if not name: continue
         # without the icon of its kind: "[conduit/] Altar of Marching Gloom" is the Altar of Marching Gloom
         name = plain_name(re.sub(r'<[^>]+>|\[/?hyperlink[^\]]*\]|\[\w+/\]', '', name))

@@ -56,7 +56,7 @@ Other commands:
 | `python spawnsets.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | unit categories (summon spells' spawn chances) for the same website (see below) |
 | `python citytree.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | city tree links for the same website (see below) |
 | `python magicmaterials.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | magic material sets, texts and income for the same website (see below) |
-| `python worldmap.py --site PATH [--acp mod.acp \| --no-mod]` | Infestations, Landmarks and Cosmic Happenings for the same website, and their icons |
+| `python worldmap.py --site PATH [--acp mod.acp \| --no-mod]` | Infestations, Landmarks and Cosmic and Oceanic Happenings for the same website, and their icons |
 | `python spells.py --site PATH [--acp mod.acp \| --no-mod]` | Spells and siege projects for the same website (run after `worldmap.py`, whose lists it links to) |
 | `python affinityattacks.py --site PATH [--acp mod.acp \| --no-mod]` | The Architect units' attacks by affinity, which the dump gets wrong, for the same website |
 | `python ancientwonders.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | Ancient Wonders for the same website: each wonder with its stories, options, combat enchantments and defenders, and the enchantments' icons (see below) |

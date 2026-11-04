@@ -14,14 +14,16 @@ Pictures aren't in the game's readable icon libraries: the site's own are found 
                   growth}, pools [{label, units, others}]: a pool per variant (a Mistwalker Camp per season)
     landmarks     key, name, dlc, lore, adjacent, city (the texts for adjacent provinces and for a city with enough of
                   them), enchantments {name, description, icon}, units (ids in Units.json), picture, icon
-    happenings    key, name, group (Minor, Major, Intrigue, Special), category, dlc, sub, description, duration (turns,
-                  None when play decides), warning (turns of foreshadowing), image, icon, story {text, options}
+    happenings    key, name, group (Minor, Major, Intrigue, Special, Oceanic), category (an Oceanic one's Minor or Major), dlc,
+                  sub, description, duration (turns, None when play decides), warning (turns of foreshadowing), image, icon,
+                  story {text, options}; an Oceanic one's events [{label, text, options [{text, costs, rewards, units}]}]
+                  and units (all its options let cities draft)
 """
-import argparse, datetime, json, os, re, sys
+import argparse, datetime, json, os, re, struct, sys
 
 import aow4diff, alltexts, tooltips
-from ancientwonders import GameIcons, Story, WORDS, bare, text_of as aw_text, unit_pools
-from citytree import Game, fields, refs, names, value, tags, msgid, hexid
+from ancientwonders import Effects, GameIcons, Story, WORDS, bare, text_of as aw_text, unit_pools
+from citytree import Game, fields, refs, names, value, tags, msgid, hexid, units_needing
 
 # a structure placed only by a story realm, a tome or a happening repeats the normal one under its name
 LEFT_OUT = re.compile(r'^\s*TSR |Lost Soul|^Intrigue Happening|Vision of Promise|Beacon of Light')
@@ -34,7 +36,8 @@ UNCHECKED = re.compile(r'(?:<br>)*If left unchecked, they will grow in strength,
 
 HAPPENING_GROUP = [(re.compile(r'^Minor Cosmic Happening - (.+?) - Type'), 'Minor'),
                    (re.compile(r'^Major Cosmic Happening - (.+?) - Type'), 'Major'),
-                   (re.compile(r'^Intrigue Happening - (.+?) - Type'), 'Intrigue')]
+                   (re.compile(r'^Intrigue Happening - (.+?) - Type'), 'Intrigue'),
+                   (re.compile(r'^(Minor|Major) Oceanic Happening - Type'), 'Oceanic')]
 # happenings outside those families that any game can have: a tome's, a Vision of Ruin's, a realm trait's
 SPECIAL = re.compile(r'Vision of Ruin|^Blood Moon|^Warped Seasons')
 # a story realm's checkpoints wear the Constellation type
@@ -166,6 +169,43 @@ def landmarks(game, T, icons, site, warn):
     return sorted(got.values(), key=lambda e: e['name'])
 
 
+# an Oceanic happening's story events by the end of their name; DEPRECATED ones are left out
+EVENT_LABEL = {'Prelude': 'Prelude', 'Intro': 'Beginning', 'Warning': 'Warning', 'Outro': 'End', '1st Prize': "The winner's prize",
+               'Participation Prize': "The others' prize"}
+
+
+def oceanic_events(game, T, rid, rows, needed_by, warn):
+    """an Oceanic happening's story: the events its schedule shows, then those they or it hand on to (the prizes), found in
+    its own pack by their id in the raw data, as a script's links aren't decoded. Each option's costs, rewards and the units
+    the properties it adds let cities draft (Mating Season's Feed the Spawning Shoals: Nimu, Seamare...)"""
+    own = [e for e in game.of_class('TStoryEventResource') if game.pack[e] == game.pack[rid] and 'DEPRECATED' not in game.name(e)]
+    def linked(x):
+        raw = game.raw[x]
+        return [e for e in own if e != x and struct.pack('<II', int(e[8:], 16), int(e[:8], 16)) in raw]
+    evs = [i for r in rows for n, i in refs(r.get('Story Events')) if i in own]
+    for x in [rid] + list(evs): evs += [e for e in linked(x) if e not in evs]
+    out, all_units = [], []
+    for ev in evs:
+        label = EVENT_LABEL.get(game.name(ev).split(' - ')[-1].strip())
+        if not label:
+            warn.append('%s: an event with no label' % game.name(ev))
+            continue
+        S = Story(T, 'this realm', {})
+        f = fields(game.node(ev))
+        text = [t for t in (S.text(f[k]) for k in ('Text [Body Header]', 'Text [Body Lore]', 'Text [Body Footer]') if f.get(k)) if t]
+        buttons = fields(f.get('Buttons')).get('List') if f.get('Buttons') else None
+        options = []
+        for b in (buttons[1] if buttons and buttons[0] == 'l' else []):
+            bf = fields(b)
+            E = Effects(game)
+            E.block(fields(bf.get('Script')).get('Actions'))
+            units = list(dict.fromkeys(u['id'] for i in E.adds for u in sorted(needed_by.get(i, []), key=lambda u: int(u['tier']))))
+            all_units += units
+            options.append({'text': UNIT_WORD.sub(r'', S.text(bf['Text Button'])), 'costs': E.costs, 'rewards': E.rewards, 'units': units})
+        if text or options: out.append({'label': label, 'text': [UNIT_WORD.sub(r'', t) for t in text], 'options': options})
+    return out, list(dict.fromkeys(all_units))
+
+
 def happenings(game, T, icons, site, warn):
     old = json.load(open(os.path.join(site, 'Data', 'GEN', 'CosmicHappenings.json'), encoding='utf-8-sig'))
     image_of = {e['extraLookup']: e['image'] for e in old if e.get('extraLookup')}
@@ -173,6 +213,7 @@ def happenings(game, T, icons, site, warn):
     image_named = {key_of(re.sub(r'\(.*\)', '', e['name'])): e['image'] for e in old}
     folder = os.path.join(site, 'Icons', 'CosmicHappenings')
     story_events = {e: game.name(e) for e in game.of_class('TStoryEventResource')}
+    needed_by = units_needing(game, site)
     got = {}
     for rid in game.of_class('TScriptedWorldCrisisResource'):
         label = game.name(rid)
@@ -186,6 +227,8 @@ def happenings(game, T, icons, site, warn):
                     if m: group, category = g, m.group(1)
         if not group: continue
         f = fields(game.node(rid))
+        # an Oceanic one's kind is in its tags: The Nevermoor's type, icon and crisis type are the Minor ones'
+        if group == 'Oceanic': category = 'Major' if 'HappeningScopeType.Happening.MajorHappening' in tags(f.get('Tags')) else 'Minor'
         name = text_of(T, rid, 'Name')
         if name in got: continue    # Toll of Seasons: the manager and the realm trait's
         name_id = msgid(f.get('Name')) or ''
@@ -194,6 +237,8 @@ def happenings(game, T, icons, site, warn):
         warning = next((int(value(r.get('Turn'))) for r in rows if value(r.get('Name')) == 'Triggering' and value(r.get('Turn'))), None)
         link = refs(f.get('Icon - Default'))
         icon = CATEGORY_ICON.get(link[0][0]) if link else None
+        # the Oceanic ones share their kind's icon
+        if group == 'Oceanic' and link: icon = icons.write(link, folder, 'category_icon_' + key_of(link[0][0]))
         icon = icon or icons.write(link, folder, 'icon_' + key_of(name))
         if not icon: warn.append('%s: no icon' % name)
         duration = value(f.get('Duration'))
@@ -212,8 +257,9 @@ def happenings(game, T, icons, site, warn):
                 worded = lambda t: UNIT_WORD.sub(r'\1\2', t)
                 e['story'] = {'text': [worded(p) for p in parts if p],
                               'options': [worded(S.text(fields(b)['Text Button'])) for b in (buttons[1] if buttons and buttons[0] == 'l' else [])]}
+        if group == 'Oceanic': e['events'], e['units'] = oceanic_events(game, T, rid, rows, needed_by, warn)
         got[name] = e
-    order = {g: i for i, g in enumerate(('Minor', 'Major', 'Intrigue', 'Special'))}
+    order = {g: i for i, g in enumerate(('Minor', 'Major', 'Intrigue', 'Special', 'Oceanic'))}
     return sorted(got.values(), key=lambda e: (order[e['group']], e['category'], key_of(e['name'])))
 
 
