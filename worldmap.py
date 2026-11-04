@@ -16,8 +16,8 @@ Pictures aren't in the game's readable icon libraries: the site's own are found 
                   them), enchantments {name, description, icon}, units (ids in Units.json), picture, icon
     happenings    key, name, group (Minor, Major, Intrigue, Special, Oceanic), category (an Oceanic one's Minor or Major), dlc,
                   sub, description, duration (turns, None when play decides), warning (turns of foreshadowing), image, icon,
-                  story {text, options}; an Oceanic one's events [{label, text, options [{text, costs, rewards, units}]}]
-                  and units (all its options let cities draft)
+                  an intrigue's story {text, options}; the others' events [{label, text, options [{text, costs, rewards,
+                  units, gains}]}], units (all their options let cities draft) and gains (one-copy units they give)
 """
 import argparse, datetime, json, os, re, struct, sys
 
@@ -176,11 +176,13 @@ EVENT_LABEL = {'Prelude': 'Prelude', 'Foreshadow': 'Foreshadowing', 'Foreshadowi
                '1st Prize': "The winner's prize", 'Participation Prize': "The others' prize"}
 
 
-def happening_events(game, T, rid, rows, needed_by, warn, follow=False):
+def happening_events(game, T, rid, rows, needed_by, one_copy, warn, follow=False):
     """a happening's story: the events its schedule shows, each once, and with follow (the Oceanic ones) those they or it
     hand on to (the prizes), found in its own pack by their id in the raw data, as a script's links aren't decoded; the
-    Cosmic ones share a pack, where a chance match would bring in another's. Each option's costs, rewards and the units the
-    properties it adds let cities draft (Mating Season's Feed the Spawning Shoals: Nimu, Seamare...)"""
+    Cosmic ones share a pack, where a chance match would bring in another's. Each option's costs, rewards, the units the
+    properties it adds let cities draft (Mating Season's Feed the Spawning Shoals: Nimu, Seamare...), and the one-copy units
+    they give (gains: citytree.ONE_COPY_UNITS, Frozen Seas' Ancient Hoarfrost Manta). Returns the events, all the units their
+    options unlock, and all those they give"""
     own = [e for e in game.of_class('TStoryEventResource') if game.pack[e] == game.pack[rid] and 'DEPRECATED' not in game.name(e)]
     def linked(x):
         raw = game.raw[x]
@@ -188,7 +190,7 @@ def happening_events(game, T, rid, rows, needed_by, warn, follow=False):
     evs = list(dict.fromkeys(i for r in rows for n, i in refs(r.get('Story Events')) if i in game.raw and 'DEPRECATED' not in game.name(i)))
     if follow:
         for x in [rid] + list(evs): evs += [e for e in linked(x) if e not in evs]
-    out, all_units = [], []
+    out, all_units, all_gains = [], [], []
     for ev in evs:
         label = EVENT_LABEL.get(re.sub(r' Event$', '', game.name(ev).split(' - ')[-1].strip()))
         if not label:
@@ -203,11 +205,14 @@ def happening_events(game, T, rid, rows, needed_by, warn, follow=False):
             bf = fields(b)
             E = Effects(game)
             E.block(fields(bf.get('Script')).get('Actions'))
-            units = list(dict.fromkeys(u['id'] for i in E.adds for u in sorted(needed_by.get(i, []), key=lambda u: int(u['tier']))))
+            of = lambda by: list(dict.fromkeys(u['id'] for i in E.adds for u in sorted(by.get(i, []), key=lambda u: int(u['tier']))))
+            units, gains = of(needed_by), of(one_copy)
             all_units += units
-            options.append({'text': UNIT_WORD.sub(r'\1\2', S.text(bf['Text Button'])), 'costs': E.costs, 'rewards': E.rewards, 'units': units})
+            all_gains += gains
+            options.append({'text': UNIT_WORD.sub(r'\1\2', S.text(bf['Text Button'])), 'costs': E.costs, 'rewards': E.rewards, 'units': units,
+                            **({'gains': gains} if gains else {})})
         if text or options: out.append({'label': label, 'text': [UNIT_WORD.sub(r'\1\2', t) for t in text], 'options': options})
-    return out, list(dict.fromkeys(all_units))
+    return out, list(dict.fromkeys(all_units)), list(dict.fromkeys(all_gains))
 
 
 # a happening's picture the game has but no resource links: Warped Seasons' own (its events show none; a story realm's
@@ -268,7 +273,7 @@ def happenings(game, T, icons, pictures, site, warn):
     # the Major ones have no text id there: by name, without its affinity
     image_named = {key_of(re.sub(r'\(.*\)', '', e['name'])): e['image'] for e in old}
     folder = os.path.join(site, 'Icons', 'CosmicHappenings')
-    needed_by = units_needing(game, site)
+    needed_by, one_copy = units_needing(game, site), units_needing(game, site, one_copy=True)
     got = {}
     for rid in game.of_class('TScriptedWorldCrisisResource'):
         label = game.name(rid)
@@ -314,7 +319,8 @@ def happenings(game, T, icons, pictures, site, warn):
                               'options': [worded(S.text(fields(b)['Text Button'])) for b in (buttons[1] if buttons and buttons[0] == 'l' else [])]}
         # its events, each with its choices; an intrigue's are its opening event (above) and one random war event over and over
         if group != 'Intrigue':
-            e['events'], e['units'] = happening_events(game, T, rid, rows, needed_by, warn, follow=group == 'Oceanic')
+            e['events'], e['units'], gains = happening_events(game, T, rid, rows, needed_by, one_copy, warn, follow=group == 'Oceanic')
+            if gains: e['gains'] = gains
         # its picture: the one its events show (or one the game has unlinked), else upstream's (Toll of Seasons); the
         # intrigues and the Visions of Ruin's ages have none in the game, their events show where they happen
         story_tags = [t for r in rows for n, i in refs(r.get('Story Events')) if i in game.raw for t in tags(fields(game.node(i)).get('Story tags'))]

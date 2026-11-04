@@ -367,14 +367,17 @@ def build(game, site):
 
 # what the data doesn't tell, from the maintainer: units no player can get, though a structure still unlocks them
 UNUSED_UNITS = {'ram_warship': 'Not in use (the Shipyard unlocks it)', 'ballista_warship': 'Not in use (the Grand Wharf unlocks it)'}
+# and units a player gets one of, though what gives it also grants the property their recruitment needs: no city drafts
+# them (the game's tooltip for Frozen Seas' choice names the Hoarfrost Manta alone)
+ONE_COPY_UNITS = {'ancient_hoarfrost_manta': "One, from Frozen Seas' Use the gem to attract and raise your own Hoarfrost Mantas"}
 
 
-def units_needing(game, site):
+def units_needing(game, site, one_copy=False):
     """{property id: [units]}: a unit's Required Structure Properties names the properties that let a city draft it, any one
     of them, which a structure, a society trait or an artifact grants (Clay Forge grants "Clay Arbalest - Structure Property").
-    UNUSED_UNITS are left out"""
+    UNUSED_UNITS and ONE_COPY_UNITS are left out; with one_copy, the ONE_COPY_UNITS alone"""
     unit_of = {hexid(u['resid']): u for u in json.load(open(os.path.join(site, 'Data', 'EN', 'Units.json'), encoding='utf-8-sig'))
-               if u['id'] not in UNUSED_UNITS}
+               if u['id'] not in UNUSED_UNITS and (u['id'] in ONE_COPY_UNITS) == one_copy}
     needed_by = {}
     for r in game.of_class('TBaseUnitR'):
         if r not in unit_of: continue
