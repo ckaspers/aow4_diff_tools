@@ -159,6 +159,16 @@ the Winds).
 
 `--dry-run` reports what would change and writes nothing. It takes about a minute.
 
+## Tooltip links that lead nowhere new (website check)
+
+`python checktooltips.py` serves the website (`site` in `config.json`, or `--site`), opens its Search page in Edge
+(Playwright) and runs every text the site holds (the dumps, `all.json`, the concept tooltips and its `Data/GEN` files,
+about 46,000) through the site's own link code, following each of the 42,000 links as its tooltip would. It lists the
+links whose tooltip is the very thing the text belongs to (`self`), says what the text says (`same text`), or has its
+name and nearly its words (`repeats`), with where each is seen; `--json` writes them too. The site's `LinksElsewhere`
+(`Data/Builder.js`) sends such a link to another thing of its name or unlinks it, so a finding is one that rule missed.
+Run it after `update_site.bat`. It takes about a minute.
+
 ## Unit categories for a website
 
 `spawnsets.py` writes the site's `Data/GEN/all_spawnsets.json`: every `TUnitCategory` (CategoryName, its

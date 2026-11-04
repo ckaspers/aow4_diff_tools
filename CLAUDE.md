@@ -125,6 +125,7 @@ same two as floats). These are read by size: `guess` takes a stored 1 for a list
 - `alltexts.py` standalone: the website's `Data/EN/all.json` and `concept_tooltips.json` from the live game with the mod (`Texts`: GLOBAL
   names from the tooltip libraries, typed values from the links that show a text, `{TAG>Field}` as the game
   shows it, the lowest when nothing tells which of several resources is meant, as the game does until one applies to a unit). `update_site.bat` runs it, then `spawnsets.py`, `citytree.py`, `magicmaterials.py`, `ancientwonders.py`, `worldmap.py`, `spells.py` and `affinityattacks.py`.
+- `checktooltips.py` standalone: a website check in Edge (Playwright, own http server on a free port). Runs every text the site's data holds through `AddTagIconsForStatusEffects` and follows each link as `HandleExtraTooltips` would (concept, ability by slug or name as `lookupStatusEffect`, unit); reports links whose tooltip is the text's own thing, its words, or its name with nearly its words (bag of words, 75%: looser than the site's `LinksElsewhere`, which keeps word order). 0 findings on 2026-11-04.
 - `spawnsets.py` standalone: the website's `Data/GEN/all_spawnsets.json`, every `TUnitCategory` with its sets'
   unit names (a set is a `TUnitSet` by SetName, or a unit by its DataStoreTag).
 - `tmlicons.py` standalone: the game's text icons for the website (`Icons/TML`, `Style/tmlicons.css`); `bc7.py`
