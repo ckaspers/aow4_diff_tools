@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mod comparison</title>
+<style>
+:root {
+  --bg: #f7f6f3; --panel: #ffffff; --ink: #1f2328; --muted: #6a6f76; --line: #e2e0da;
+  --a: #2f6fb3; --a-bg: #e7f0fa; --b: #a3561d; --b-bg: #fbeee2;
+  --same: #2e7d4f; --same-bg: #e5f3ea; --diff: #b3261e; --diff-bg: #fbe9e7;
+  --old: #7a5c00; --old-bg: #fff4cc; --code: #f1efea;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17181a; --panel: #1f2123; --ink: #e6e4df; --muted: #9a9ea4; --line: #33363a;
+    --a: #7fb2ea; --a-bg: #1d2a38; --b: #e5a46e; --b-bg: #3a2a1c;
+    --same: #79c99a; --same-bg: #1c3125; --diff: #f08b82; --diff-bg: #3a201e;
+    --old: #e8c95c; --old-bg: #3a3218; --code: #26282b;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17181a; --panel: #1f2123; --ink: #e6e4df; --muted: #9a9ea4; --line: #33363a;
+  --a: #7fb2ea; --a-bg: #1d2a38; --b: #e5a46e; --b-bg: #3a2a1c;
+  --same: #79c99a; --same-bg: #1c3125; --diff: #f08b82; --diff-bg: #3a201e;
+  --old: #e8c95c; --old-bg: #3a3218; --code: #26282b;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1280px; margin: 0 auto; padding: 24px 16px 80px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 17px; margin: 0; }
+.sub { color: var(--muted); margin-bottom: 16px; }
+.lead { color: var(--muted); margin: 4px 0 10px; max-width: 900px; }
+.notes { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; }
+.notes li { margin: 3px 0; }
+.ma { color: var(--a); font-weight: 600; } .mb { color: var(--b); font-weight: 600; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; margin-bottom: 16px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; text-decoration: none; color: inherit; display: block; }
+.tile b { font-size: 22px; display: block; font-variant-numeric: tabular-nums; }
+.tile span { color: var(--muted); font-size: 13px; }
+.bar { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 8px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.bar input { flex: 1; min-width: 200px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); font: inherit; }
+.bar button, .chip { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.chip.on { border-color: var(--ink); }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin: 14px 0; }
+section > header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.count { color: var(--muted); font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 10px; }
+details.e { border-top: 1px solid var(--line); }
+details.e > summary { cursor: pointer; padding: 6px 2px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; list-style: none; }
+details.e > summary::-webkit-details-marker { display: none; }
+details.e > summary::before { content: "\25B8"; color: var(--muted); width: 10px; }
+details.e[open] > summary::before { content: "\25BE"; }
+.nm { font-weight: 600; }
+.ty { color: var(--muted); font-size: 12px; }
+.pk { color: var(--muted); font-size: 12px; }
+.badge { font-size: 11px; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
+.b-diff { background: var(--diff-bg); color: var(--diff); } .b-same { background: var(--same-bg); color: var(--same); }
+.b-a { background: var(--a-bg); color: var(--a); } .b-b { background: var(--b-bg); color: var(--b); }
+.b-old { background: var(--old-bg); color: var(--old); } .b-warn { background: var(--diff-bg); color: var(--diff); }
+.body { padding: 4px 0 12px 18px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; vertical-align: top; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; color: var(--muted); font-size: 12px; }
+td { white-space: pre-wrap; word-break: break-word; }
+td.p { color: var(--muted); width: 30%; }
+td.g { width: 18%; }
+td.keep { color: var(--muted); font-style: italic; }
+tr.s-diff td.a, tr.s-diff td.b { background: var(--diff-bg); }
+tr.s-same td.a, tr.s-same td.b { background: var(--same-bg); }
+tr.s-a td.a { background: var(--a-bg); } tr.s-b td.b { background: var(--b-bg); }
+.old { display: block; font-size: 11px; color: var(--old); background: var(--old-bg); border-radius: 4px; padding: 0 5px; margin-top: 2px; font-style: normal; white-space: normal; }
+.tx { display: block; margin-top: 3px; padding-left: 8px; border-left: 2px solid var(--line); color: var(--ink); font-size: 12.5px; }
+.flag { color: var(--diff); font-size: 12.5px; margin: 4px 0; }
+pre { background: var(--code); border-radius: 6px; padding: 8px 10px; font: 12px/1.4 ui-monospace, Consolas, monospace; overflow-x: auto; margin: 6px 0; white-space: pre; }
+pre .add { color: var(--same); } pre .del { color: var(--diff); } pre .hd { color: var(--muted); font-weight: 600; }
+h4 { margin: 10px 0 2px; font-size: 13px; }
+.empty { color: var(--muted); font-style: italic; }
+.hide { display: none !important; }
+@media (max-width: 700px) { td.p { width: auto; } table, thead, tbody, tr, td, th { font-size: 12px; } }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script id="data" type="application/json">__DATA__</script>
+<script>
+const D = JSON.parse(document.getElementById('data').textContent);
+const A = D.A.name, B = D.B.name;
+const app = document.getElementById('app');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const ma = '<span class="ma">' + esc(A) + '</span>', mb = '<span class="mb">' + esc(B) + '</span>';
+document.title = A + ' and ' + B;
+
+const SECTIONS = [
+  ['same', 'Both change it the same way', D.same,
+   `Resources both mods change, with the same changes. Each mod's copy is a whole copy of the resource, so with both mods on, one copy is used; here they agree.`],
+  ['diff', 'Both change it, differently', D.diff,
+   `Resources both mods change, where the changes are not the same. Field by field: the game's value, then ${ma}'s, then ${mb}'s. <i>keeps the game's</i> means that mod's copy has the game's value there. With both mods on, one mod's copy of the whole resource is used, so the other's changes to it, including fields it alone changes, are lost.`],
+  ['onlyB', 'Only ' + B, D.onlyB, `What ${mb} changes in resources ${ma} leaves at the game's version.`],
+  ['onlyA', 'Only ' + A, D.onlyA, `What ${ma} changes in resources ${mb} leaves at the game's version.`],
+];
+
+function tiles() {
+  const tc = s => D.texts.filter(t => t.s === s).length;
+  const t = [
+    ['same', D.same.length, 'resources: same change in both'],
+    ['diff', D.diff.length, 'resources: both change, differently'],
+    ['onlyB', D.onlyB.length, 'resources: only ' + B],
+    ['onlyA', D.onlyA.length, 'resources: only ' + A],
+    ['new', D.newBoth.length + D.newB.length + D.newA.length, 'new resources (own packs)'],
+    ['texts', D.texts.length, `texts: ${tc('same')} same, ${tc('diff')} different, ${tc('b')} only ${B}, ${tc('a')} only ${A}`],
+  ];
+  return '<div class="tiles">' + t.map(([id, n, l]) => `<a class="tile" href="#${id}"><b>${n}</b><span>${esc(l)}</span></a>`).join('') + '</div>';
+}
+
+function notes() {
+  const li = [];
+  li.push(`Every resource either mod changes, compared field by field with the ${esc(D.game)} game. Resources neither mod changes are left out, and so are overrides that are copies of the game's version (${ma}: ${D.A.copies}, ${mb}: ${D.B.copies}).`);
+  li.push(`${ma}: ${D.A.ovs} overrides, ${D.A.new} new resources in ${D.A.packs.length} packs, ${D.A.texts} texts (${D.A.textsSame} the game's own words). ${mb}: ${D.B.ovs} overrides, ${D.B.new} new resources in ${D.B.packs.length} pack${D.B.packs.length === 1 ? '' : 's'}, ${D.B.texts} texts (${D.B.textsSame} the game's own words).`);
+  li.push(`<span class="badge b-old">game's old value</span> marks a change that puts back what a game update replaced: the copy is older than that update, it is not the modder's edit. Update reports read: ${D.updates.length ? D.updates.map(esc).join('; ') : 'none'}. Changes the game made before the oldest of these can't be told from the modder's own edits, so in an older copy some of what a mod seems to change is the game's earlier values.`);
+  for (const [m, x] of [[ma, D.A], [mb, D.B]]) {
+    if (x.notarget.length) li.push(`${m}: ${x.notarget.length} override${x.notarget.length === 1 ? '' : 's'} with no target in the game (they apply to nothing): ` + x.notarget.map(e => esc(e.n) + ' <span class="ty">' + esc(e.t) + ', ' + esc(e.k) + '</span>').join('; '));
+    if (x.gone) li.push(`${m}: ${x.gone} deletion${x.gone === 1 ? '' : 's'} of resources the game no longer has.`);
+    if (x.repeats) li.push(`${m}: ${x.repeats} resource${x.repeats === 1 ? ' is' : 's are'} overridden more than once; the first copy is compared.`);
+  }
+  return '<ul class="notes">' + li.map(x => '<li>' + x + '</li>').join('') + '</ul>';
+}
+
+function oldMark(u) { return u ? `<span class="old">game's old value: undoes ${esc(u)}</span>` : ''; }
+function words(r, k) { return r['t' + k] ? `<span class="tx">${esc(r['t' + k])}</span>` : ''; }
+function cell(r, k) {
+  if (r[k] === undefined) return `<td class="${k} keep">keeps the game's</td>`;
+  return `<td class="${k}">${esc(r[k])}${words(r, k)}${oldMark(r['u' + k])}</td>`;
+}
+function table(rows, noGame) {
+  return '<table><thead><tr><th>Field</th>' + (noGame ? '' : '<th>Game</th>') + `<th class="ma">${esc(A)}</th><th class="mb">${esc(B)}</th></tr></thead><tbody>` +
+    rows.map(r => `<tr class="s-${r.s}"><td class="p">${esc(r.p)}</td>` + (noGame ? '' : `<td class="g">${esc(r.g)}${words(r, 'g')}</td>`) + cell(r, 'a') + cell(r, 'b') + '</tr>').join('') +
+    '</tbody></table>';
+}
+function script(lines, who, cls) {
+  if (!lines || !lines.length) return '';
+  return `<h4>Script: <span class="${cls}">${esc(who)}</span>'s copy against the game</h4><pre>` + lines.map(l =>
+    l.startsWith('[') ? `<span class="hd">${esc(l)}</span>` : l.startsWith('@@') ? `<span class="hd">${esc(l)}</span>` :
+    l.startsWith('+') ? `<span class="add">${esc(l)}</span>` : l.startsWith('-') ? `<span class="del">${esc(l)}</span>` : esc(l)).join('\n') + '</pre>';
+}
+function badges(e, sec) {
+  const b = [];
+  const n = e.rows ? e.rows.length : 0;
+  if (sec === 'diff') {
+    const d = e.rows.filter(r => r.s === 'diff').length, sa = e.rows.filter(r => r.s === 'a').length, sb = e.rows.filter(r => r.s === 'b').length, s = e.rows.filter(r => r.s === 'same').length;
+    if (d) b.push(`<span class="badge b-diff">${d} differ</span>`);
+    if (s) b.push(`<span class="badge b-same">${s} same</span>`);
+    if (sa) b.push(`<span class="badge b-a">${sa} only ${esc(A)}</span>`);
+    if (sb) b.push(`<span class="badge b-b">${sb} only ${esc(B)}</span>`);
+  } else if (n) b.push(`<span class="badge ${sec === 'onlyA' ? 'b-a' : sec === 'onlyB' ? 'b-b' : 'b-same'}">${n} field${n === 1 ? '' : 's'}</span>`);
+  const old = (e.rows || []).filter(r => r.ua || r.ub).length;
+  if (old) b.push(`<span class="badge b-old">${old} game's old value${old === 1 ? '' : 's'}</span>`);
+  if (old && old === n) b.push(`<span class="badge b-old">only old values: an outdated copy</span>`);
+  if (e.copy) b.push(`<span class="badge b-warn">${esc(sec === 'onlyA' ? B : A)} holds a copy of the game's version</span>`);
+  if (e.f && e.f.length) b.push(`<span class="badge b-warn">${e.f.length} warning${e.f.length === 1 ? '' : 's'}</span>`);
+  return b.join(' ');
+}
+function entry(e, sec) {
+  const d = document.createElement('details');
+  d.className = 'e';
+  d.dataset.q = (e.n + ' ' + e.t + ' ' + e.k + ' ' + e.id + ' ' + (e.rows || []).map(r => [r.p, r.a, r.b, r.ta, r.tb].filter(Boolean).join(' ')).join(' ')).toLowerCase();
+  d.dataset.t = e.t;
+  d.innerHTML = `<summary><span class="nm">${esc(e.n)}</span><span class="ty">${esc(e.t)}</span><span class="pk">${esc(e.k)}</span>${badges(e, sec)}</summary>`;
+  d.addEventListener('toggle', () => {
+    if (!d.open || d.querySelector('.body')) return;
+    let h = '<div class="body">';
+    if (e.copy) h += `<div class="flag">${esc(sec === 'onlyA' ? B : A)} also overrides this resource, with a copy of the game's version: if its copy is the one used, these changes are lost.</div>`;
+    for (const f of e.f || []) h += `<div class="flag">${esc(f)}</div>`;
+    if (e.rows && e.rows.length) h += table(e.rows, sec.startsWith('new'));
+    else if (sec === 'newBoth') h += '<div class="empty">The two are the same.</div>';
+    h += script(e.sa, A, 'ma') + script(e.sb, B, 'mb');
+    if (e.body) h += `<h4>${sec === 'newBoth' ? esc(B) + "'s copy" : 'The resource'}</h4><pre>${esc(e.body.join('\n'))}</pre>`;
+    h += `<div class="ty">id ${esc(e.id)}</div></div>`;
+    d.insertAdjacentHTML('beforeend', h);
+  });
+  return d;
+}
+function typeChips(list) {
+  const c = {};
+  for (const e of list) c[e.t] = (c[e.t] || 0) + 1;
+  return '<div class="chips">' + Object.entries(c).sort((a, b) => b[1] - a[1]).map(([t, n]) =>
+    `<button class="chip" data-type="${esc(t)}">${esc(t)} ×${n}</button>`).join('') + '</div>';
+}
+function sectionEl(id, title, list, lead, sec) {
+  const s = document.createElement('section');
+  s.id = id;
+  s.innerHTML = `<header><h2>${esc(title)}</h2><span class="count" data-n="${list.length}">${list.length}</span></header><div class="lead">${lead}</div>` +
+    (list.length ? typeChips(list) : '<div class="empty">None.</div>');
+  for (const e of list) s.appendChild(entry(e, sec || id));
+  return s;
+}
+function textsEl() {
+  const s = document.createElement('section');
+  s.id = 'texts';
+  const groups = [['diff', 'Both set it, differently'], ['same', 'Both set it the same'], ['b', 'Only ' + B], ['a', 'Only ' + A]];
+  let h = `<header><h2>Texts</h2><span class="count">${D.texts.length}</span></header><div class="lead">Texts in the mods' .po files that are not the game's own words: either a game text reworded (the game's wording is shown) or a text of the mod's own. With both mods on, one wording of a text both set is used.</div>`;
+  for (const [s2, title] of groups) {
+    const list = D.texts.filter(t => t.s === s2);
+    h += `<details class="e tg"><summary><span class="nm">${esc(title)}</span><span class="count">${list.length}</span></summary><div class="body">` +
+      (list.length ? '<table><thead><tr><th>Text id</th><th>Game</th>' + `<th class="ma">${esc(A)}</th><th class="mb">${esc(B)}</th></tr></thead><tbody>` +
+        list.map(t => `<tr class="s-${s2}" data-q="${esc((t.id + ' ' + (t.g || '') + ' ' + (t.a || '') + ' ' + (t.b || '')).toLowerCase())}"><td class="p">${esc(t.id)}</td><td class="g">${t.g == null ? '<span class="empty">(the mod\'s own)</span>' : esc(t.g)}</td>` +
+          (t.a === undefined ? '<td class="a keep">keeps the game\'s</td>' : `<td class="a">${esc(t.a)}</td>`) +
+          (t.b === undefined ? '<td class="b keep">keeps the game\'s</td>' : `<td class="b">${esc(t.b)}</td>`) + '</tr>').join('') + '</tbody></table>'
+        : '<div class="empty">None.</div>') + '</div></details>';
+  }
+  s.innerHTML = h;
+  return s;
+}
+
+app.innerHTML = `<h1>${ma} and ${mb}</h1><div class="sub">Each against the ${esc(D.game)} game · made ${esc(D.generated)}</div>` + tiles() + notes() +
+  `<div class="bar"><input id="q" type="search" placeholder="Filter by name, type, pack, field or text"><button id="open">Open all shown</button><button id="close">Close all</button></div>`;
+for (const [id, title, list, lead] of SECTIONS) app.appendChild(sectionEl(id, title, list, lead));
+const nw = document.createElement('div');
+nw.id = 'new';
+app.appendChild(nw);
+nw.appendChild(sectionEl('newBoth', 'New resources: both mods add one of this type and name', D.newBoth,
+  `Resources of the mods' own packs (not overrides) that the other mod also adds, under its own id. Field by field: ${ma}'s against ${mb}'s.`, 'newBoth'));
+nw.appendChild(sectionEl('newB', 'New resources: only ' + B, D.newB, `Resources of ${mb}'s own packs: things the game doesn't have.`, 'newB'));
+nw.appendChild(sectionEl('newA', 'New resources: only ' + A, D.newA, `Resources of ${ma}'s own packs: things the game doesn't have.`, 'newA'));
+app.appendChild(textsEl());
+
+let typeOn = null;
+function filter() {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  for (const s of app.querySelectorAll('section')) {
+    let n = 0;
+    for (const d of s.querySelectorAll(':scope > details.e[data-q]')) {
+      const ok = (!q || d.dataset.q.includes(q)) && (!typeOn || d.dataset.t === typeOn);
+      d.classList.toggle('hide', !ok); if (ok) n++;
+    }
+    for (const tr of s.querySelectorAll('tr[data-q]')) tr.classList.toggle('hide', !!q && !tr.dataset.q.includes(q));
+    const c = s.querySelector(':scope > header .count[data-n]');
+    if (c) c.textContent = (q || typeOn) ? n + ' of ' + c.dataset.n : c.dataset.n;
+  }
+}
+document.getElementById('q').addEventListener('input', filter);
+app.addEventListener('click', ev => {
+  const b = ev.target.closest('.chip');
+  if (!b) return;
+  typeOn = typeOn === b.dataset.type ? null : b.dataset.type;
+  for (const c of app.querySelectorAll('.chip')) c.classList.toggle('on', c.dataset.type === typeOn);
+  filter();
+});
+document.getElementById('open').addEventListener('click', () => {
+  for (const d of app.querySelectorAll('details.e:not(.hide)')) d.open = true;
+});
+document.getElementById('close').addEventListener('click', () => {
+  for (const d of app.querySelectorAll('details.e')) d.open = false;
+});
+</script>
+</body>
+</html>

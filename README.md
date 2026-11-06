@@ -52,6 +52,7 @@ Other commands:
 | `python aow4diff.py snapshot [--label NAME]` | snapshot only |
 | `python aow4diff.py dump "<resource name>" [--acp mod.acp]` | print how one resource decodes |
 | `python extract_schema.py --exe "<game>\ResourceED.exe"` | rebuild the schema by hand |
+| `python modcompare.py OTHER [--base MOD] [--out FILE] [--history DIR]` | two mods side by side, each against the live game (see below) |
 | `python alltexts.py --site PATH [--acp mod.acp \| --no-mod] [--dry-run]` | all of the game's texts for an aow4db-style website (see below) |
 | `python spawnsets.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | unit categories (summon spells' spawn chances) for the same website (see below) |
 | `python citytree.py --site PATH [--out FILE] [--acp mod.acp \| --no-mod]` | city tree links for the same website (see below) |
@@ -88,6 +89,28 @@ Paths live in `config.json` (game folder, Mods folder, snapshots, reports, and `
 * Resources are matched by id and compared after decoding, so moving list items, re-stamped
   script node ids or a reference's display name drifting are not reported as changes
   (they are counted as cosmetic).
+
+## Two mods compared
+
+`modcompare.py` compares another mod with yours, each against the live game, and writes
+`reports/<base>_vs_<other>_<build>.html`. A mod is its folder or its `.acp`; a Workshop download is in
+`steamapps\workshop\content\1669000\<item id>`. `--base` defaults to the first mod in the Mods folder.
+
+Only what a mod changes takes part: overrides that differ from the live game, the resources of its own
+packs, and `.po` texts that aren't the game's own words. The report's sections:
+
+- **Both change it the same way**: resources whose changes match field for field.
+- **Both change it, differently**: field by field, the game's value, the base mod's and the other's, or
+  *keeps the game's*. A changed text link shows the words of each mod's text.
+- **Only the other mod** and **only the base mod**: what one changes where the other leaves the game's.
+  A badge says when the other mod overrides it too with a copy of the game's version.
+- **New resources**: each mod's own packs, paired across the mods by type and name.
+- **Texts**: msgids both `.po` files set, or one of them.
+
+An override is a whole copy of its resource, so with both mods on, one mod's copy of a shared resource
+is used and the other's changes to it are lost. A change that puts back what a game update replaced is
+marked with that update, from the update reports in `reports/` and any `--history` folder. Updates before
+those reports can't be told from the modder's own edits. Takes a few seconds.
 
 ## Tooltip keys (mod reports)
 

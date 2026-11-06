@@ -117,6 +117,10 @@ same two as floats). These are read by size: `guess` takes a stored 1 for a list
   `mark_unmerged` (labels mod differences that undo a change listed in an update report in
   `reports/`).
 - `tooltips.py` tooltip key checks. `stale.py` dead links + "entries only your copy has".
+- `modcompare.py` standalone: two mods, each diffed against the live game with `Model.diff_record`, then lined up
+  per change (`slots`: the path, plus the head for a list item added or removed); a script section counts as the
+  same only when the two copies' scripts match (a diff of copy against copy). `mark_unmerged` runs on each
+  side. Viewer: `compare_template.html` (its own page, not `template.html`).
 - `citytree.py` standalone: city tree links for the website (`Game` = game + mod packs +
   overrides, `build` → roots, cultures, structures; `structure_extras`, `trait_units`, `skill_units` → StructurePredictions.json).
   Imports the modules above, changes none.
