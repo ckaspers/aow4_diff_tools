@@ -10,8 +10,8 @@ game fills in its own values there, where alltexts.Texts can only give the lowes
 dump leaves out, or a value it lost ("a -hex radius"), is filled here.
 
     spells   key, id, name, variant (of spells sharing an id, what tells them apart), page, tabs, type, tactical, cost and
-             upkeep [[amount, icon]], op (casting points), description, requisites, units, spawns (the unit categories its
-             summons draw from: spawn_categories), sources, tier, affinities, dlc, icon
+             upkeep [[amount, icon]], op (casting points), description, requisites, units, spawns (of a spell that summons
+             a unit at random, the unit categories it draws from: spawn_categories), sources, tier, affinities, dlc, icon
     siege    key, id, name, tab, cost, damage, description, sources, tier, affinities, dlc, icon
     sources  kind (Tome, Magic Victory, Hero Skill, Artifact, Secret Spell, Ancient Wonder, Landmark, Cosmic Happening, City Structure,
              Culture, Trait, Ruler), name, and of a tome its id, tier, icon, affinities
@@ -66,11 +66,17 @@ def resources(node):
             for e in (block[1] if block and block[0] == 'l' else [])]
 
 
-def spawn_categories(game, rid):
-    """the unit categories a spell summons from (their CategoryName, all_spawnsets.json's category): those its summon effects
-    name, reached through its targeters and effects. A category the game still has but no effect names is no part of it:
-    Evolved's Raise Undead Army summons from its T3 category alone, while the game keeps its Low and Mid ones"""
-    out, seen, todo = [], set(), [(rid, 0)]
+def spawn_categories(game, rid, sets_of):
+    """the unit categories of a spell that summons a unit at random (their CategoryName, all_spawnsets.json's category), [] for
+    the others: the categories its summon effects name, reached through its targeters and effects. A category the game still
+    has but no effect names is no part of it: Evolved's Raise Undead Army summons from its T3 category alone, while the game
+    keeps its Low and Mid ones.
+    At random is a summon from a category of more than one unit, or a recruit offering fewer of them to choose from than it
+    has (Call Wild Animal: 4 of the 14 of its default animals). One that offers them all is the player's choice (Call Young
+    Dragon, Summon Sprite), and a category of one unit is that unit (Crystallize Essence's Lithorine of each tier). A spell
+    that is random anywhere keeps all its categories: Summon Elemental's single spirits tell what each land gives.
+    sets_of: {CategoryName: its units' sets}, of every category of that name, as the game adds them up"""
+    out, random, seen, todo = [], False, set(), [(rid, 0)]
     while todo:
         r, depth = todo.pop(0)
         if r in seen or r not in game.raw: continue
@@ -79,9 +85,14 @@ def spawn_categories(game, rid):
             if i not in game.raw: continue
             if game.cls(i) == 'TUnitCategory':
                 category = value(fields(game.node(i)).get('CategoryName'))
-                if category and category not in out: out.append(category)
+                if not category: continue
+                if category not in out: out.append(category)
+                units = len(set(sets_of.get(category, [])))
+                # FNumRecruitmentOptions' default in the schema is 3
+                offered = int(value(fields(game.node(r)).get('Num Recruit Options')) or 3) if 'Recruit' in game.cls(r) else 1
+                if units > max(offered, 1) or (offered == 1 and units > 1): random = True
             elif depth < 5 and re.search(r'Targeter|Effect|Event', game.cls(i)): todo.append((i, depth + 1))
-    return out
+    return out if random else []
 
 
 def amounts(text):
@@ -272,6 +283,12 @@ def build(game, T, site, icons, warn):
     def siege_cost(rid):
         return resources(fields(game.node(rid)).get('Cost')), [], 0
 
+    sets_of = {}
+    for r in game.of_class('TUnitCategory'):
+        f = fields(game.node(r))
+        sets = f.get('Sets')
+        sets_of.setdefault(value(f.get('CategoryName')), []).extend(value(x) for x in (sets[1] if sets and sets[0] == 'l' else []))
+
     icon_of = learn_icons(game, dump.values(), spell_cost)
     icon_of.update({k: v for k, v in learn_icons(game, siege_dump.values(), siege_cost).items() if k not in icon_of})
     def worded(rows, name):
@@ -330,7 +347,7 @@ def build(game, T, site, icons, warn):
                      'type': kind_html, 'tactical': game.cls(rid) == 'TCombatSpecialOperationR', 'cost': worded(cost, name), 'op': op,
                      'upkeep': worded(upkeep, name), 'description': description,
                      'requisites': [e['requisite'] for e in (s or {}).get('enchantment_requisites', [])],
-                     'units': [u['slug'] for u in (s or {}).get('summoned_units', [])], 'spawns': spawn_categories(game, rid),
+                     'units': [u['slug'] for u in (s or {}).get('summoned_units', [])], 'spawns': spawn_categories(game, rid, sets_of),
                      'sources': came, 'tier': tier_of(came),
                      'affinities': spell_affinities(came, f), 'dlc': dlc_of(game, rid), 'icon': icon, '_label': game.name(rid)})
 
