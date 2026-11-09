@@ -22,6 +22,7 @@ How a text is written for the site:
     [br/] [gold/]                                    <br> <gold></gold>
     <<m:text>>                                       its plural, or one after a 1 ("1 [turn/] <<m:Turn>>")
     1 Turns, 3 Turn (a link the game counts)         1 Turn, 3 Turns: a number decides the form (agree)
+    words the game leaves without a link             linked by the site where SITE_LINKS says ("Advanced Work Camp")
 The GLOBAL names are the keys of the game's tooltip libraries (TEDataStoreResource: "Tooltip Global Library", ...).
 A text several resources show with different values takes the values most of them have.
 """
@@ -35,6 +36,18 @@ CONCEPT = 'TDefaultGameConceptDescriptionResource'
 TYPED = re.compile(r'\{(?!GLOBAL\.|LOC\.)[^{}<>\[\]]+\}')
 KEY = re.compile(r'\{[^{}<\[\]]+\}')    # not "{<hp></hp>}": the site names that concept itself
 TOKEN = re.compile(rb'[A-Za-z0-9_@]{3,}')
+# words a text of the game names without a link, linked by the site to the resource with that DataStoreTag (whose
+# tooltip build_grouped makes), as the game links others: Mercantile Barony's Outposts "gain access to an Advanced
+# Work Camp upgrade", the Improved Work Camp (OUTPOST_EXTRACTION_CAMP), which no text of the game links
+SITE_LINKS = {
+    'DLC@SILVERSEAS@CULTURE_MERCANTILE@MERCANTILE_BARONY':
+        {'Advanced Work Camp': 'GLOBAL.STRUCTURE_UPGRADES.OUTPOST_EXTRACTION_CAMP'},
+}
+def site_links(id_, text):
+    """text, the entry id_'s, with SITE_LINKS' words linked"""
+    for words, key in SITE_LINKS.get(id_, {}).items():
+        if '[hyperlink,%s]' % key not in text: text = text.replace(words, '[hyperlink,%s]%s[/hyperlink]' % (key, words))
+    return text
 # how the game shows a field's number. It writes no sign of its own: its texts do ("+{...}%", "-{...}%")
 def whole(d): return d
 def absolute(d): return abs(d)
@@ -281,6 +294,8 @@ class Texts:
         want |= {t.encode() for s in texts.values() for t in re.findall(r'\{(?:GLOBAL\.[A-Z_]+\.)?([A-Za-z0-9_]+)(?:>|\.Hyperlink\}|\.Name\}|\})', s)}
         # and the data store paths a text link types in ({hex} = "{CHAOS_PULSE_CIRCLE_TARGETER>AREA>Radius}")
         want |= {t for raw in game.raw.values() for t in re.findall(rb'\{([A-Za-z0-9_]+)>', raw)}
+        # and the tags of the site's own links, which no text of the game names (OUTPOST_EXTRACTION_CAMP)
+        want |= {key.rsplit('.', 1)[1].encode() for links in SITE_LINKS.values() for key in links.values()}
         self.where = collections.defaultdict(list)
         for rid, raw in game.raw.items():
             for tok in set(TOKEN.findall(raw)) & want: self.where[tok.decode()].append(rid)
@@ -559,7 +574,7 @@ def build(texts_of, old):
         id_, field = mid.rsplit('@', 1)
         field = field.lower()
         if field in ('id', 'dlc'): continue
-        new = texts_of(mid)
+        new = site_links(id_, texts_of(mid))
         if id_ not in entries: order.append(id_)
         e = entries.setdefault(id_, {'id': id_})
         # a text no resource shows has no values to fill in: the one the site has keeps its numbers
@@ -567,7 +582,7 @@ def build(texts_of, old):
             # its wording stays; its lists and plural forms are written as the site's other texts
             text = re.sub(r'\[hyperlink\.(\w+)(?:\.\w+)*\]', r'[hyperlink,GLOBAL.\1]', e[field])
             text = re.sub(r'<<([^<>:]*)>>', r'\1', many(text))
-            e[field] = agree(style_tags(rebuild_lists(text)))
+            e[field] = site_links(id_, agree(style_tags(rebuild_lists(text))))
             kept += 1
             continue
         if id_.startswith('DLC@') and 'DLC' not in e: e['DLC'] = id_.split('@')[1]
