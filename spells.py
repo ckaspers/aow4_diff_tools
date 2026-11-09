@@ -10,7 +10,8 @@ game fills in its own values there, where alltexts.Texts can only give the lowes
 dump leaves out, or a value it lost ("a -hex radius"), is filled here.
 
     spells   key, id, name, variant (of spells sharing an id, what tells them apart), page, tabs, type, tactical, cost and
-             upkeep [[amount, icon]], op (casting points), description, requisites, units, sources, tier, affinities, dlc, icon
+             upkeep [[amount, icon]], op (casting points), description, requisites, units, spawns (the unit categories its
+             summons draw from: spawn_categories), sources, tier, affinities, dlc, icon
     siege    key, id, name, tab, cost, damage, description, sources, tier, affinities, dlc, icon
     sources  kind (Tome, Magic Victory, Hero Skill, Artifact, Secret Spell, Ancient Wonder, Landmark, Cosmic Happening, City Structure,
              Culture, Trait, Ruler), name, and of a tome its id, tier, icon, affinities
@@ -63,6 +64,24 @@ def resources(node):
     block = fields(node).get('Entries') if node else None
     return [((refs(fields(e).get('Resource')) or [(value(fields(e).get('Resource')),)])[0][0], int(float(value(fields(e).get('Value')) or 0)))
             for e in (block[1] if block and block[0] == 'l' else [])]
+
+
+def spawn_categories(game, rid):
+    """the unit categories a spell summons from (their CategoryName, all_spawnsets.json's category): those its summon effects
+    name, reached through its targeters and effects. A category the game still has but no effect names is no part of it:
+    Evolved's Raise Undead Army summons from its T3 category alone, while the game keeps its Low and Mid ones"""
+    out, seen, todo = [], set(), [(rid, 0)]
+    while todo:
+        r, depth = todo.pop(0)
+        if r in seen or r not in game.raw: continue
+        seen.add(r)
+        for n, i in alltexts.all_refs(game.node(r)):
+            if i not in game.raw: continue
+            if game.cls(i) == 'TUnitCategory':
+                category = value(fields(game.node(i)).get('CategoryName'))
+                if category and category not in out: out.append(category)
+            elif depth < 5 and re.search(r'Targeter|Effect|Event', game.cls(i)): todo.append((i, depth + 1))
+    return out
 
 
 def amounts(text):
@@ -311,7 +330,8 @@ def build(game, T, site, icons, warn):
                      'type': kind_html, 'tactical': game.cls(rid) == 'TCombatSpecialOperationR', 'cost': worded(cost, name), 'op': op,
                      'upkeep': worded(upkeep, name), 'description': description,
                      'requisites': [e['requisite'] for e in (s or {}).get('enchantment_requisites', [])],
-                     'units': [u['slug'] for u in (s or {}).get('summoned_units', [])], 'sources': came, 'tier': tier_of(came),
+                     'units': [u['slug'] for u in (s or {}).get('summoned_units', [])], 'spawns': spawn_categories(game, rid),
+                     'sources': came, 'tier': tier_of(came),
                      'affinities': spell_affinities(came, f), 'dlc': dlc_of(game, rid), 'icon': icon, '_label': game.name(rid)})
 
     # the same spell given by several tomes is one card; different texts under one id tell what they're for
