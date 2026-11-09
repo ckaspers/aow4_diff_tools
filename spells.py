@@ -11,7 +11,8 @@ dump leaves out, or a value it lost ("a -hex radius"), is filled here.
 
     spells   key, id, name, variant (of spells sharing an id, what tells them apart), page, tabs, type, tactical, cost and
              upkeep [[amount, icon]], op (casting points), description, requisites, units, spawns (of a spell that summons
-             a unit at random, the unit categories it draws from: spawn_categories), sources, tier, affinities, dlc, icon
+             a unit at random, the unit categories it draws from: spawn_categories), offers (of those a recruit draws
+             from: {category: {options, weights}}), sources, tier, affinities, dlc, icon
     siege    key, id, name, tab, cost, damage, description, sources, tier, affinities, dlc, icon
     sources  kind (Tome, Magic Victory, Hero Skill, Artifact, Secret Spell, Ancient Wonder, Landmark, Cosmic Happening, City Structure,
              Culture, Trait, Ruler), name, and of a tome its id, tier, icon, affinities
@@ -26,7 +27,7 @@ import argparse, bisect, collections, datetime, json, os, re, struct, sys
 
 import aow4diff, alltexts, stale, tooltips
 from ancientwonders import GameIcons, text_of
-from citytree import Game, fields, refs, names, value, msgid, hexid, units_needing, units_of
+from citytree import Game, fields, refs, names, tags, value, msgid, hexid, units_needing, units_of
 from worldmap import dlc_of, key_of
 
 SPELL_CLASSES = ('TCombatSpecialOperationR', 'TSustainedSpecialOperationR', 'TInstantSpecialOperationR',
@@ -66,17 +67,19 @@ def resources(node):
             for e in (block[1] if block and block[0] == 'l' else [])]
 
 
-def spawn_categories(game, rid, sets_of):
-    """the unit categories of a spell that summons a unit at random (their CategoryName, all_spawnsets.json's category), [] for
-    the others: the categories its summon effects name, reached through its targeters and effects. A category the game still
-    has but no effect names is no part of it: Evolved's Raise Undead Army summons from its T3 category alone, while the game
-    keeps its Low and Mid ones.
+def spawn_categories(game, rid, sets_of, weight_of):
+    """(categories, offers) of a spell that summons a unit at random, ([], {}) for the others. categories: the unit
+    categories its summon effects name (their CategoryName, all_spawnsets.json's category), reached through its targeters
+    and effects. A category the game still has but no effect names is no part of it: Evolved's Raise Undead Army summons
+    from its T3 category alone, while the game keeps its Low and Mid ones.
     At random is a summon from a category of more than one unit, or a recruit offering fewer of them to choose from than it
     has (Call Wild Animal: 4 of the 14 of its default animals). One that offers them all is the player's choice (Call Young
     Dragon, Summon Sprite), and a category of one unit is that unit (Crystallize Essence's Lithorine of each tier). A spell
     that is random anywhere keeps all its categories: Summon Elemental's single spirits tell what each land gives.
+    offers: {category: {"options": how many a recruit offers, "weights": {set: its pick weight where not 100}}}, from the
+    recruit's Recruitment Settings (weight_of)
     sets_of: {CategoryName: its units' sets}, of every category of that name, as the game adds them up"""
-    out, random, seen, todo = [], False, set(), [(rid, 0)]
+    out, offers, random, seen, todo = [], {}, False, set(), [(rid, 0)]
     while todo:
         r, depth = todo.pop(0)
         if r in seen or r not in game.raw: continue
@@ -88,11 +91,53 @@ def spawn_categories(game, rid, sets_of):
                 if not category: continue
                 if category not in out: out.append(category)
                 units = len(set(sets_of.get(category, [])))
-                # FNumRecruitmentOptions' default in the schema is 3
-                offered = int(value(fields(game.node(r)).get('Num Recruit Options')) or 3) if 'Recruit' in game.cls(r) else 1
-                if units > max(offered, 1) or (offered == 1 and units > 1): random = True
+                if 'Recruit' in game.cls(r):
+                    f = fields(game.node(r))
+                    # FNumRecruitmentOptions' default in the schema is 3
+                    offered = int(value(f.get('Num Recruit Options')) or 3)
+                    weights = {x: w for x in dict.fromkeys(sets_of.get(category, [])) for w in [weight_of(x, f.get('Recruitment Settings'))] if w != 100}
+                    offers[category] = {'options': offered, 'weights': weights}
+                    if units > offered: random = True
+                elif units > 1: random = True
             elif depth < 5 and re.search(r'Targeter|Effect|Event', game.cls(i)): todo.append((i, depth + 1))
-    return out if random else []
+    return (out, offers) if random else ([], {})
+
+
+def pick_weights(game, warn):
+    """weight_of(set, settings): a set's pick weight in a recruit's Recruitment Settings, 100 unless an entry's filter takes
+    its unit, the first that does (Call Wild Animal: Tier II animals that Evolve 40, other Tier II ones 75). A filter's
+    requisites are a tier's ("Tier 2 Requisite") and Evolve's, which the unit's tier resource tells ("Evolve - Tier 2"): the
+    game gives units those properties itself, out of the data"""
+    unit_of = {}
+    for r in game.of_class('TBaseUnitR'):
+        tag = value(fields(game.node(r)).get('DataStoreTag'))
+        if tag: unit_of.setdefault(tag, r)
+    for r in game.of_class('TUnitSet'):
+        f = fields(game.node(r))
+        units = [i for n, i in refs(f.get('Units')) if i in game.raw]
+        if value(f.get('SetName')) and units: unit_of[value(f.get('SetName'))] = units[0]
+
+    def meets(unit, req):
+        tier = refs(fields(game.node(unit)).get('Tier Resource Link'))
+        m = re.match(r'(Evolve - )?Tier (\d+)$', tier[0][0].strip()) if tier else None
+        f = fields(game.node(req)) if req in game.raw else {}
+        level = [t.rsplit('.Tier', 1)[1] for t in tags(f.get('Tags')) if t.startswith('Logic.RequisiteLogic.Tier.Tier')]
+        if level: return bool(m) and m.group(2) == level[0]
+        if value(f.get('DataStoreTag')) == 'EVOLVE_REQUISITE': return bool(m and m.group(1))
+        warn.append("a recruit's pick weight asks %s, which spells.py cannot tell of a unit" % game.name(req))
+        return False
+
+    def weight_of(set_name, settings):
+        unit = unit_of.get(set_name)
+        for e in (fields(settings).get('Entries') or ('l', []))[1]:
+            f = fields(e)
+            filt = fields(f.get('Requisite Filter'))
+            need = lambda *labels: [i for l in labels for n, i in refs(filt.get(l))]
+            must, any_of, never = need('Must Have Requisites', 'field_5'), need('Required Requisites', 'field_3'), need('Forbidden Requisites', 'field_4')
+            if unit and all(meets(unit, q) for q in must) and (not any_of or any(meets(unit, q) for q in any_of)) and not any(meets(unit, q) for q in never):
+                return int(value(f.get('Pick Weight')) or 100)
+        return 100
+    return weight_of
 
 
 def amounts(text):
@@ -283,6 +328,7 @@ def build(game, T, site, icons, warn):
     def siege_cost(rid):
         return resources(fields(game.node(rid)).get('Cost')), [], 0
 
+    weight_of = pick_weights(game, warn)
     sets_of = {}
     for r in game.of_class('TUnitCategory'):
         f = fields(game.node(r))
@@ -338,6 +384,7 @@ def build(game, T, site, icons, warn):
             written = icons.write(refs(f.get('Large Icon Link')), spell_dir, key)
             icon = 'SpellIcons/' + written if written else None
         came = sources.of(unlock, rid)
+        spawns, offers = spawn_categories(game, rid, sets_of, weight_of)
         page, tabs = spell_tabs(plain(kind_html), came)
         if not page:
             warn.append('%s: no page for the kind "%s"' % (name, plain(kind_html)))
@@ -347,7 +394,7 @@ def build(game, T, site, icons, warn):
                      'type': kind_html, 'tactical': game.cls(rid) == 'TCombatSpecialOperationR', 'cost': worded(cost, name), 'op': op,
                      'upkeep': worded(upkeep, name), 'description': description,
                      'requisites': [e['requisite'] for e in (s or {}).get('enchantment_requisites', [])],
-                     'units': [u['slug'] for u in (s or {}).get('summoned_units', [])], 'spawns': spawn_categories(game, rid, sets_of),
+                     'units': [u['slug'] for u in (s or {}).get('summoned_units', [])], 'spawns': spawns, 'offers': offers,
                      'sources': came, 'tier': tier_of(came),
                      'affinities': spell_affinities(came, f), 'dlc': dlc_of(game, rid), 'icon': icon, '_label': game.name(rid)})
 
