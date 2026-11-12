@@ -263,7 +263,10 @@ class Sources:
 
 
 def spell_tabs(kind, sources):
-    """the page and tabs a spell is on, by its kind ("Damage/Debuff Spell" on both) and, of an enchantment, its tomes"""
+    """the page and tabs a spell is on, by its kind ("Damage/Debuff Spell" on both) and, of an enchantment, where it comes
+    from: Generic (General Research, an affinity's tome, anything else anyone may find), Cultures, Dwellings (a dwelling's
+    pact, as the site's IsDwellingPact has it: Pirate Bond is a Free Captain's) and Happenings. Its affinities are the
+    page's filter"""
     if kind in STRATEGIC: return 'Strategic', [STRATEGIC[kind]]
     if kind in TRANSFORMATION: return 'Transformation', [TRANSFORMATION[kind]]
     if kind == 'Combat Enchantment': return 'Tactical', ['Enchantment']
@@ -271,11 +274,12 @@ def spell_tabs(kind, sources):
     if kind == 'Unit Enchantment':
         tabs = []
         for s in sources:
-            if s['kind'] != 'Tome': continue
-            if s['id'] == 'general_research': tabs.append('Generic')
-            elif not s['affinities']: tabs.append('Cultures')
-            else: tabs += s['affinities']
-        return 'Enchantment', list(dict.fromkeys(tabs)) or ['Other']
+            if s['kind'] == 'Cosmic Happening': tabs.append('Happenings')
+            elif s['kind'] != 'Tome': continue
+            elif s['id'].endswith('_pact') or s['id'] == 'pirate_bond': tabs.append('Dwellings')
+            elif s['id'] == 'general_research' or s['affinities']: tabs.append('Generic')
+            else: tabs.append('Cultures')
+        return 'Enchantment', list(dict.fromkeys(tabs)) or ['Generic']
     parts = re.sub(r' Spell$', '', kind).split('/')
     if all(p in ('Healing', 'Buff', 'Damage', 'Debuff') for p in parts): return 'Tactical', parts
     return None, []
