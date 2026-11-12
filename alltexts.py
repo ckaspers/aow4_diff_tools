@@ -38,15 +38,21 @@ KEY = re.compile(r'\{[^{}<\[\]]+\}')    # not "{<hp></hp>}": the site names that
 TOKEN = re.compile(rb'[A-Za-z0-9_@]{3,}')
 # words a text of the game names without a link, linked by the site to the resource with that DataStoreTag (whose
 # tooltip build_grouped makes), as the game links others: Mercantile Barony's Outposts "gain access to an Advanced
-# Work Camp upgrade", the Improved Work Camp (OUTPOST_EXTRACTION_CAMP), which no text of the game links
+# Work Camp upgrade", the Improved Work Camp (OUTPOST_EXTRACTION_CAMP), which no text of the game links. Or words the
+# game links to something else than it means: Moon and Shadow's friendly units "Gain 3 Evasion", stacks of the Evasion
+# status, which the game links to the Evasion concept (a bonus in %, "+10% Evasion", as the other texts linking it have)
 SITE_LINKS = {
     'DLC@SILVERSEAS@CULTURE_MERCANTILE@MERCANTILE_BARONY':
         {'Advanced Work Camp': 'GLOBAL.STRUCTURE_UPGRADES.OUTPOST_EXTRACTION_CAMP'},
+    'DLC@SECRETSOFTHEARCHMAGES@ABILITIES_WILDLIFE@ABILITY07': {'Evasion': 'GLOBAL.PROPERTIES.EVASION'},
 }
 def site_links(id_, text):
-    """text, the entry id_'s, with SITE_LINKS' words linked"""
+    """text, the entry id_'s, with SITE_LINKS' words linked: a link of the game's on them goes to the site's resource"""
     for words, key in SITE_LINKS.get(id_, {}).items():
-        if '[hyperlink,%s]' % key not in text: text = text.replace(words, '[hyperlink,%s]%s[/hyperlink]' % (key, words))
+        if '[hyperlink,%s]' % key in text: continue
+        linked = re.compile(r'\[hyperlink,[^\]]*\]%s\[/hyperlink\]' % re.escape(words))
+        link = '[hyperlink,%s]%s[/hyperlink]' % (key, words)
+        text = linked.sub(lambda m: link, text) if linked.search(text) else text.replace(words, link)
     return text
 # how the game shows a field's number. It writes no sign of its own: its texts do ("+{...}%", "-{...}%")
 def whole(d): return d
