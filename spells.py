@@ -447,7 +447,7 @@ def build(game, T, site, icons, warn):
             icon = icons.write(refs(f.get('Large Icon Link')), siege_dir, key_of(name))
         if not icon: warn.append('%s: no icon' % name)
         came = sources.of(need, rid)
-        if not need: tab = 'Everyone'
+        if not need: tab = 'Generic'
         elif any(x['kind'] == 'Tome' for x in came): tab = 'Tomes'
         else: tab = 'Other'
         siege.append({'key': s['id'] if s else key_of(name), 'id': s['id'] if s else key_of(name), 'name': name, 'tab': tab, 'cost': worded(cost, name),
