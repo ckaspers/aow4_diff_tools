@@ -249,7 +249,8 @@ what only play decides is worded generally ("your Hero", "Hero Item") and marked
 `magicmaterials.py` writes `Data/GEN/MagicMaterials.json`: each magic material set with its bonus and
 how many materials it needs (a field the decoder hides at its default of 3, different ones unless the
 set turns that off), and each material's name, global effect, lore, local income and combat
-enchantment. Texts are the game's or the mod's own, filled in with the values of the resource that
+enchantment (its picture's file name in `Icons/CombatEnchantments/`: the site's, by the enchantment's name or
+text id, else the game's icon, written there as `ancientwonders.py` does). Texts are the game's or the mod's own, filled in with the values of the resource that
 shows them, so they follow game updates and the mod, and written as `alltexts.py` writes `all.json`'s
 (concept links in the concept's own words, "1 Turn" and "2 Turns"). Run it with the same `--site`, `--acp`
 and `--no-mod` as `citytree.py`.

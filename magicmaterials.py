@@ -3,8 +3,8 @@ texts, local income and combat enchantment, read from the live game, with a mod 
 
     python magicmaterials.py --site PATH [--out PATH] [--acp MOD.acp | --no-mod]
 
-Writes Data/GEN/MagicMaterials.json. The site folder is --site, else config.json's "site"; the mod is --acp,
-else the first .acp in the Mods folder.
+Writes Data/GEN/MagicMaterials.json and the enchantments' icons missing from Icons/CombatEnchantments/. The site
+folder is --site, else config.json's "site"; the mod is --acp, else the first .acp in the Mods folder.
 
 Every text is the live game's or the mod's own, filled in with the values of the resource that shows it and
 written as all.json's are (alltexts.Texts): a concept link in the concept's own words ("Every [turn/] Turn"), a
@@ -13,13 +13,15 @@ counted one agreeing with its number ("1 Turn", "2 Turns").
     sets        key (DataStoreTag), category, name, description: texts; required: how many materials;
                 unique: whether they must differ; materials: their keys
     materials   key -> name, description (global effect), lore, income [[resource, value]] (local),
-                combat {name, description}, dlc (as the site's dlcMap names it)
+                combat {name, description, key (its text id's last part), icon (file name in
+                Icons/CombatEnchantments/)}, dlc (as the site's dlcMap names it)
 
 Texts are in the site's format: <bulletlist><bullet>, <icon></icon>, [hyperlink,GLOBAL.X]words[/hyperlink].
 """
 import argparse, datetime, json, os, re, sys
 
 import aow4diff, alltexts, tooltips
+from ancientwonders import GameIcons
 from citytree import Game, fields, refs, names, value, tags, msgid, income
 
 # TTokenSetBonus fields the decoder leaves out at their defaults (schema_db.json: FRequiredAmount 3,
@@ -34,8 +36,15 @@ def text_of(T, rid, field):
     return alltexts.site_markup(t or '').replace('\0', '<eventColor>{').replace('\1', '}</eventColor>')
 
 
-def build(game, T):
+def build(game, T, site):
     warn = []
+    ench_dir, icons = os.path.join(site, 'Icons', 'CombatEnchantments'), GameIcons(game)
+
+    def icon_of(c, link):
+        """the enchantment's picture: the site's, named after the enchantment or (an older one) after its text id; else
+        the game's icon, written under the enchantment's name"""
+        name = re.sub(r'[^a-z0-9]+', '_', alltexts.plain_name(c['name']).lower()).strip('_')
+        return next((k + '.png' for k in (name, c['key']) if os.path.exists(os.path.join(ench_dir, k + '.png'))), None)             or icons.write(link, ench_dir, name)
 
     materials, tags_of = {}, {}
     for rid in game.of_class('TStructureR'):
@@ -57,6 +66,8 @@ def build(game, T):
             if msgid(cf.get('Screen Name')):
                 m['combat'] = {'name': text_of(T, i, 'Screen Name'), 'description': text_of(T, i, 'Description'),
                                'key': re.sub(r'@NAME$', '', msgid(fields(game.node(i)).get('Screen Name')) or '').split('@')[-1].lower()}
+                m['combat']['icon'] = icon_of(m['combat'], refs(cf.get('Icon Link')))
+                if not m['combat']['icon']: warn.append('%s: no icon for %s' % (key, m['combat']['name']))
                 break
         else:
             warn.append('%s: no combat enchantment' % key)
@@ -97,8 +108,9 @@ def main():
     if not site: sys.exit('which website? pass --site or set "site" in config.json')
     acp = None if args.no_mod else args.acp or (aow4diff.mod_acps(cfg) or [None])[0]
     game = Game(cfg, acp)
+    game.cfg = cfg
     T = alltexts.Texts(game, tooltips.load_texts(cfg['game'], os.path.dirname(acp) if acp else ''))
-    data, warn = build(game, T)
+    data, warn = build(game, T, site)
     data = {'generated': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), 'build': aow4diff.build_label(cfg['game']),
             'mod': os.path.splitext(os.path.basename(acp))[0] if acp else None, **data}
     out = args.out or os.path.join(site, 'Data', 'GEN', 'MagicMaterials.json')
