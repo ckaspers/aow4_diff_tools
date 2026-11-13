@@ -153,29 +153,33 @@ def compare(old, new, diff, p='', tp='', label=None, owner=None):
         compare_script(old, new, diff, p, tp)
         return
     if ko == 'o':
-        if old[1] != new[1] and old[1] and new[1]:
-            diff.add(F_STRUCT, 'changed', p, tp, extra=['  - ' + describe(old), '  + ' + describe(new)])
-            return
-        cls = new[1] or old[1]
-        base_tp = (join(tp, cls) if cls else tp) if tp else ''
-        def keyed(fields):
-            seen = {}; out = {}; order = []
-            for lab, own, v in fields:
-                i = seen.get(lab, 0); seen[lab] = i + 1
-                k = (lab, i)
-                out[k] = (own, v); order.append(k)
-            return out, order
-        a, ao = keyed(old[2]); b, bo = keyed(new[2])
-        order = bo + [k for k in ao if k not in b]
-        for k in order:
-            lab = k[0] if k[1] == 0 else '%s#%d' % (k[0], k[1] + 1)
-            own = (b.get(k) or a.get(k))[0]
-            ov = a.get(k, (None, None))[1]; nv = b.get(k, (None, None))[1]
-            sub_tp = join(base_tp, lab) if tp else join(own or cls or '', lab)
-            compare(ov, nv, diff, join(p, lab), sub_tp, lab, own)
+        compare_object(old, new, diff, p, tp)
         return
     if ko == 'l':
         compare_list(old[1], new[1], diff, p, tp)
+
+def compare_object(old, new, diff, p, tp):
+    """two object nodes ('o', class, fields), field by field"""
+    if old[1] != new[1] and old[1] and new[1]:
+        diff.add(F_STRUCT, 'changed', p, tp, extra=['  - ' + describe(old), '  + ' + describe(new)])
+        return
+    cls = new[1] or old[1]
+    base_tp = (join(tp, cls) if cls else tp) if tp else ''
+    def keyed(fields):
+        seen = {}; out = {}; order = []
+        for lab, own, v in fields:
+            i = seen.get(lab, 0); seen[lab] = i + 1
+            k = (lab, i)
+            out[k] = (own, v); order.append(k)
+        return out, order
+    a, ao = keyed(old[2]); b, bo = keyed(new[2])
+    order = bo + [k for k in ao if k not in b]
+    for k in order:
+        lab = k[0] if k[1] == 0 else '%s#%d' % (k[0], k[1] + 1)
+        own = (b.get(k) or a.get(k))[0]
+        ov = a.get(k, (None, None))[1]; nv = b.get(k, (None, None))[1]
+        sub_tp = join(base_tp, lab) if tp else join(own or cls or '', lab)
+        compare(ov, nv, diff, join(p, lab), sub_tp, lab, own)
 
 def compare_list(a, b, diff, p, tp):
     # references: a set
@@ -225,7 +229,9 @@ def compare_script(old, new, diff, p, tp):
     fo = {l: v for l, o, v in old[2]}; fn = {l: v for l, o, v in new[2]}
     rest_o = ('o', old[1], [x for x in old[2] if x[0] not in SECTIONS])
     rest_n = ('o', new[1], [x for x in new[2] if x[0] not in SECTIONS])
-    compare(rest_o, rest_n, diff, p, tp)
+    # the fields outside the script sections, compared as a plain object: through compare(),
+    # a TTriggerSettings node comes straight back here
+    if rest_o != rest_n: compare_object(rest_o, rest_n, diff, p, tp)
     for sec in SECTIONS:
         kind, lines = section_diff(sec, fo.get(sec), fn.get(sec))
         if kind is None: continue
