@@ -301,6 +301,12 @@ class Texts:
         want |= {t.encode() for s in texts.values() for t in re.findall(r'\{(?:GLOBAL\.[A-Z_]+\.)?([A-Za-z0-9_]+)(?:>|\.Hyperlink\}|\.Name\}|\})', s)}
         # and the data store paths a text link types in ({hex} = "{CHAOS_PULSE_CIRCLE_TARGETER>AREA>Radius}")
         want |= {t for raw in game.raw.values() for t in re.findall(rb'\{([A-Za-z0-9_]+)>', raw)}
+        # and the GLOBAL names one types in ({combatproperty} = "{GLOBAL.PROPERTIES.VORTEX_STORM.Hyperlink}", the
+        # Tempestuous Vortex's): their tag is in no text of the game. build_grouped makes their tooltips, as a page can
+        # show a text with any resource's values (the three Leviathan landmarks share one, each with its enchantment)
+        self.typed_globals = {'GLOBAL.%s.%s' % (g.decode(), t.decode()) for raw in game.raw.values()
+                              for g, t in re.findall(rb'\{GLOBAL\.([A-Z_]+)\.([A-Za-z0-9_]+)(?:\.Hyperlink|\.Name)?\}', raw)}
+        want |= {k.rsplit('.', 1)[1].encode() for k in self.typed_globals}
         # and the tags of the site's own links, which no text of the game names (OUTPOST_EXTRACTION_CAMP)
         want |= {key.rsplit('.', 1)[1].encode() for links in SITE_LINKS.values() for key in links.values()}
         self.where = collections.defaultdict(list)
@@ -662,6 +668,7 @@ def build_grouped(texts_of, texts, out, site, libraries, write_icons=True):
     for e in texts:
         for v in e.values():
             if isinstance(v, str): linked.update(re.findall(r'\[hyperlink,(GLOBAL\.[A-Z_]+\.[A-Za-z0-9_]+)\]', v))
+    linked |= texts_of.typed_globals    # Eldritch Wake: only Landmarks.json's Leviathan Tail links it
     made, icons = 0, 0
     for key in sorted(linked):
         group, tag = key.split('.')[1:]
