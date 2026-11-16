@@ -24,7 +24,8 @@ How a text is written for the site:
     1 Turns, 3 Turn (a link the game counts)         1 Turn, 3 Turns: a number decides the form (agree)
     words the game leaves without a link             linked by the site where SITE_LINKS says ("Advanced Work Camp")
 The GLOBAL names are the keys of the game's tooltip libraries (TEDataStoreResource: "Tooltip Global Library", ...).
-A text several resources show with different values takes the values most of them have.
+A text several resources show with different values takes the values most of them have; a key those leave out
+and nothing else fills takes the value another of them types in.
 """
 import argparse, collections, decimal, json, os, re, sys
 
@@ -307,7 +308,7 @@ class Texts:
             for tok in set(TOKEN.findall(raw)) & want: self.where[tok.decode()].append(rid)
         self.globals = self._libraries()
         self._users, self._tagged, self._done, self._concepts, self._linked, self._shown_by = {}, {}, {}, {}, {}, {}
-        self._defaults = {}
+        self._defaults, self._elsewhere = {}, {}
         self.unused = set()    # texts with values to type in that no resource shows
 
     # ---- what the GLOBAL names stand for ----
@@ -518,18 +519,22 @@ class Texts:
 
     # ---- texts ----
     def users(self, mid):
-        """the values typed into the text links that show mid, those most of them have"""
+        """the values typed into the text links that show mid, those most of them have. A key those leave out that
+        another link types in is kept apart (_elsewhere), for fill to take when nothing else gives its value"""
         if mid not in self._users:
-            seen, shown_by = collections.Counter(), []
+            seen, shown_by, typed = collections.Counter(), [], collections.defaultdict(collections.Counter)
             for rid in self.where.get(mid, []):
                 for path, m, kv in tooltips.links(self.game.node(rid)):
                     if m == mid:
-                        seen[tuple(sorted((k, v) for k, v in kv if v not in (None, '')))] += 1
+                        vals = tuple(sorted((k, v) for k, v in kv if v not in (None, '')))
+                        seen[vals] += 1
+                        for k, v in vals: typed[k][v] += 1
                         shown_by.append(rid)
             self._shown_by[mid] = shown_by
             if len(seen) > 1: self.stats['texts whose resources differ'] += 1
             if not seen: self.unused.add(mid)
             self._users[mid] = dict(seen.most_common(1)[0][0]) if seen else {}
+            self._elsewhere[mid] = {k: c.most_common(1)[0][0] for k, c in typed.items() if k not in self._users[mid]}
         return self._users[mid]
 
     def fill(self, s, vals, mid='', context=()):
@@ -548,6 +553,11 @@ class Texts:
             if '>' in key:
                 v = self.stored(key, context)
                 if v is not None: self.stats['stored values filled'] += 1; return v
+            # typed in by another resource showing the text: the Evolved spell Consecrating Firestorm types in its
+            # "{CONSECRATING_FIRESTORM_SPELL>Duration}" (3), a field the spell lacks; its tome skill, showing the
+            # same text, types in nothing. Of the two, the first is taken: the skill's
+            v = self._elsewhere.get(mid, {}).get(key)
+            if v is not None: self.stats['values typed in by another resource'] += 1; return v
             # a script's text variables: "{Player.Name}" and "{INT_Previous}" read as Player and Previous
             g = re.fullmatch(r'\{(\w+)\.Name\}|\{INT_(\w+)\}', key)
             if g: return spaced(g.group(1) or g.group(2))
