@@ -134,7 +134,11 @@ same two as floats). These are read by size: `guess` takes a stored 1 for a list
   unit names (a set is a `TUnitSet` by SetName, or a unit by its DataStoreTag).
 - `tmlicons.py` standalone: the game's text icons for the website (`Icons/TML`, `Style/tmlicons.css`); `bc7.py`
   decodes their BC7 atlases. A tag's image id is the atlas record's id + 2 in TML_ICONS, + 1 elsewhere (checked
-  against the images' names; the reason is not known).
+  against the images' names; the reason is not known). A record's fields 14 and 15 are the image's empty margins
+  (left/top, right/bottom, each minus twice its fraction of the box): `clear_margins` clears them, and a small piece
+  apart from the image lying against them, as an atlas packed by outline puts neighbours' edges in a box. Only
+  `[warningPositive/]` and `[warningNegative/]` (the unit banner's arrows, INTERFACEASSETS atlas 24) have margins as
+  of 2026-11-18; TML_ICONS records leave them at 0. `hudimages.py export` doesn't clear them yet.
 - `abilities.py` standalone: the abilities the game's texts link to that the dump leaves out
   (`Data/GEN/LinkedAbilities.json`), in Abilities.json's format. Worked out against the dump (`--check`): AbilityType
   0-5 = repeating, single use, full, full continue, free, leave one; a Can't Miss or missing accuracy setting is Always

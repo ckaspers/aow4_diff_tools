@@ -11,7 +11,9 @@ Where the game keeps them: a text icon is a TGCNoesisTMLIconTag, its tag and an 
 atlas's name and the image's id in it. LIBRARY is a content library's own name, the first string of its table
 (TML_ICONS is Libraries/Interface/TML_Icons.clb; DIPLOMACY_ICONS and UNITYPEICONS hold the relation and unit type
 icons). An atlas is one texture (BC7, or plain RGBA) with a record per image: field 1 its id, 2 its position and 3
-its size as fractions of the atlas (2 is left out at 0,0), 6 and 7 its size in pixels. A tag's id counts the atlas's
+its size as fractions of the atlas (2 is left out at 0,0), 6 and 7 its size in pixels, 14 and 15 its empty margins
+(left and top, right and bottom; left out at 0): an atlas packs its images by outline, so a box can hold its
+neighbours' edges, and those margins are cleared (clear_margins). A tag's id counts the atlas's
 own two entries before its images (Food.png is image 141, [food/] asks for 143). An atlas with no image records is
 one image (TML_ICONS TXA\\3, the Eldritch Realms Void Stones icon).
 """
@@ -74,8 +76,13 @@ def atlases(game_dir, wanted):
             body = i + 9 + 2 * n
             u, v = struct.unpack_from('<2f', recs, body + fo[2]) if 2 in fo else (0.0, 0.0)
             ident = struct.unpack_from('<I', recs, body + fo[1])[0] if 1 in fo else 0    # id 0 is not written
+            # the image's empty margins, left and top (14), right and bottom (15), each as minus twice its fraction of
+            # the box; left out at 0
+            near = struct.unpack_from('<2f', recs, body + fo[14]) if 14 in fo else (0.0, 0.0)
+            far = struct.unpack_from('<2f', recs, body + fo[15]) if 15 in fo else (0.0, 0.0)
             images.append((i, name.decode(), ident, u, v,
-                           struct.unpack_from('<I', recs, body + fo[6])[0], struct.unpack_from('<I', recs, body + fo[7])[0]))
+                           struct.unpack_from('<I', recs, body + fo[6])[0], struct.unpack_from('<I', recs, body + fo[7])[0],
+                           near + far))
         textures = []
         for mt in clbicons.TABLE.finditer(lib.head, 0, lib.data):
             k = mt.group(1)[0]
@@ -94,12 +101,50 @@ def atlases(game_dir, wanted):
             texs = [t for t in textures if at <= t['at'] < end and t['format'] in BC7 + (clbicons.RGBA,)]
             if not texs: continue
             tex = max(texs, key=lambda t: t['width'] * t['height'])    # the atlas itself, not its smaller copies
-            ims = {}
-            for i, name, ident, u, v, w, hh in images:
+            ims, margins = {}, {}
+            for i, name, ident, u, v, w, hh, (left, top, right, bottom) in images:
                 if at <= i < end:
                     ims[ident] = (name, round(u * tex['width']), round(v * tex['height']), w, hh)
-            out.setdefault((libname, number), {'texture': (lib, tex), 'images': ims, 'data': None})
+                    margins[ident] = (round(-left / 2 * w), round(-top / 2 * hh), round(-right / 2 * w), round(-bottom / 2 * hh))
+            out.setdefault((libname, number), {'texture': (lib, tex), 'images': ims, 'margins': margins, 'data': None})
     return out
+
+
+def clear_margins(rgba, w, h, margins):
+    """an image's pixels with its empty margins (left, top, right, bottom) cleared: an atlas packs its images by outline,
+    so their boxes overlap and a box holds the edges of its neighbours (the unit banner's arrows, [warningPositive/]).
+    The margins can stop a few pixels short of a neighbour: a small piece apart from the image that lies against them
+    goes too (a sliver of the disc beside [warningPositive/])"""
+    left, top, right, bottom = (max(0, m) for m in margins)
+    if not (left or top or right or bottom): return rgba
+    out = bytearray(rgba)
+    for y in range(h):
+        for x in range(w):
+            if x < left or x >= w - right or y < top or y >= h - bottom: out[(y * w + x) * 4 + 3] = 0
+    pieces, seen = [], set()
+    for start in range(w * h):
+        if out[start * 4 + 3] <= 8 or start in seen: continue
+        seen.add(start)
+        piece, todo, edge = [], [start], False
+        while todo:
+            p = todo.pop()
+            piece.append(p)
+            x, y = p % w, p // w
+            if x in (left, w - right - 1) or y in (top, h - bottom - 1): edge = True
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    nx, ny = x + dx, y + dy
+                    q = ny * w + nx
+                    if 0 <= nx < w and 0 <= ny < h and q not in seen and out[q * 4 + 3] > 8:
+                        seen.add(q)
+                        todo.append(q)
+        pieces.append((piece, edge))
+    if len(pieces) > 1:
+        largest = max(len(p) for p, e in pieces)
+        for piece, edge in pieces:
+            if edge and len(piece) < largest / 10:
+                for p in piece: out[p * 4 + 3] = 0
+    return bytes(out)
 
 
 def icon_tags(game):
@@ -154,11 +199,13 @@ def main():
         lib, tex = a['texture']
         if a['data'] is None: a['data'] = lib.pixels(tex)
         shift = SHIFT.get(libname, 1)
+        margins = (0, 0, 0, 0)
         if len(a['images']) == 1:                                  # an atlas of one image (Void Stones)
             name, x, y, w, h = next(iter(a['images'].values()))
         elif a['images']:
             if ident - shift not in a['images']: missing.append('%s (image %d of %s atlas %d)' % (tag, ident, libname, number)); continue
             name, x, y, w, h = a['images'][ident - shift]
+            margins = a['margins'][ident - shift]
         elif tex['width'] <= 128 and tex['height'] <= 128:
             x, y, w, h = 0, 0, tex['width'], tex['height']      # an atlas of one image
         else:
@@ -168,6 +215,7 @@ def main():
             rgba = b''.join(a['data'][(y + r) * row + x * 4:(y + r) * row + (x + w) * 4] for r in range(h))
         else:
             rgba = bc7.decode(a['data'], tex['width'], tex['height'], x, y, w, h)
+        rgba = clear_margins(rgba, w, h, margins)
         clbicons.write_png(os.path.join(folder, tag.lower() + '.png'), w, h, rgba)
         saved.append(tag.lower())
     own = styled_tags(site)
