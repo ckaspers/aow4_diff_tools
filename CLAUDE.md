@@ -21,6 +21,12 @@ from the code: the file formats, the editor's meaning of things, and decisions a
 ResourceED.exe, needed to run; the maintainer decided that is fine). The web version serves the
 committed copy, so a rebuilt schema reaches it only once it is committed and pushed.
 
+## Hand-kept lists
+
+What the website shows comes from the game with the mod (these tools, or the dump), not from lists kept by hand. The
+only hand-kept lists are the maintainer's overrides: `UNUSED_UNITS` (citytree.py), `NOT_SPELLS` (spells.py) and
+`SITE_LINKS` (alltexts.py). Any other is to be replaced by game data; ask the maintainer before removing one.
+
 ## File formats
 
 - **Record**: `[count byte][(fid, off) pairs][bodies]`. High bit in count: a u32 count of
