@@ -19,8 +19,8 @@ the first .acp in the Mods folder.
                   attacks     [{filter {any, none, all} of ability requisites, notes [{name, text}] (the lines the
                               game's ability tooltip adds, whatever their conditions, each with its numbers), damage (the dump's
                               way: "4<damagefrost></damagefrost> "), existing (only to the damage types the attack
-                              has), per_tier, multiplier, range, accuracy, ability_type (Repeating or Single
-                              Action: only to such attacks)}]: what its ability modifiers do to the
+                              has), per_tier, multiplier, range, accuracy, crit (critical hit chance in percent),
+                              ability_type (Repeating or Single Action: only to such attacks)}]: what its ability modifiers do to the
                               abilities they apply to; numbers only for what applies whatever the target and the hit
     units         {resid: [requisite, ...]}: each unit's requisites that some filter names
     abilities     {ability slug: [requisite, ...]}: the same for the abilities of the site's units
@@ -29,6 +29,11 @@ the first .acp in the Mods folder.
                   damage, and puts them back with the enchantment's. In the game the bonuses add up and the result is
                   rounded up: a Mythic Kraken's Melee Strike, 20 raw (22), with Empowered Beasts' +20% and Force of
                   Nature's +4 Blight, is 20 x 1.3 = 26 and 4 x 1.3 = 5.2, 6 (the maintainer's screenshots, 2026-11-24)
+    crit          {resid: [{filter, crit, ability_type}]}: a unit's own critical hit chance in percent, whatever the
+                  hit (Critical Chance: Base Attack's 10): the dump has none of it. The game's ability tooltip shows the
+                  sum of all that apply after the range, none where it is 0 (a Peacebringer's Shoot Bow with Artisan
+                  Armaments and Fateful Imbuement: 50%, the maintainer's screenshot, 2026-11-24)
+    ability_crit  {ability slug: crit}: an ability's own, every ability of the site's (an item's Trueshot: 20)
 
 How the game links them (checked 2026-11-24 against the site's unit classes, which match exactly):
 - A unit enchantment is a spell with Is Unit Enchantment. Its targeters' effects give a side property
@@ -72,6 +77,12 @@ def num(node):
     v = value(node)
     try: return float(v) if v is not None else 0.0
     except ValueError: return 0.0
+
+
+def crit_percent(mf):
+    """a critical chance modifier's bonus in percent (its Critical Chance Bonus 0.2: 20), whole where it is"""
+    p = round(num(mf.get('Critical Chance Bonus')) * 100, 2)
+    return int(p) if p == int(p) else p
 
 
 def block(node):
@@ -221,6 +232,8 @@ class Enchantments:
                    damage types the attack has (Adding Mode 2)
         per_tier   {damage, skip_first, existing}: extra damage for each tier of the unit (Counting Mode Caster Tier)
         multiplier, range, accuracy
+        crit       critical hit chance in percent (Fateful Imbuement's 20), which the game's ability tooltip shows after
+                   the range, the sum of all that apply
         only_own: an ability's own modifiers (Ice Nova's per-tier damage): what its card leaves out, its damage per tier"""
         g, a, dmg, notes = self.g, {}, collections.Counter(), []
         for n, m in refs(node):
@@ -247,6 +260,8 @@ class Enchantments:
                 a['range'] = a.get('range', 0) + int(num(mf.get('Range To Add')))
             elif mc == 'TAccuracyBoostingAbilityModifier' and num(mf.get('Accuracy Modifier')):
                 a['accuracy'] = a.get('accuracy', 0) + num(mf.get('Accuracy Modifier'))
+            elif mc == 'TCriticalChanceAbilityModifier' and num(mf.get('Critical Chance Bonus')):
+                a['crit'] = a.get('crit', 0) + crit_percent(mf)
         if dmg:
             a['damage'] = ''.join('%d<%s></%s> ' % (dmg[t], tag, tag) for t, tag in DAMAGE if dmg.get(t))
         if notes:
@@ -319,15 +334,17 @@ class Enchantments:
         # the requisites the filters name, for each unit and each of its abilities
         unit_names = {n for ups in out.values() for u in ups for k in ('any', 'none', 'all') for n in u['filter'][k]}
         dump_units = read(site, 'Data', 'EN', 'Units.json')
-        multipliers = {}
+        multipliers, crit = {}, {}
         for u in dump_units:
             uid = hexid(u['resid'])
             if uid in g.raw and str(u['resid']) not in multipliers:
-                multipliers[str(u['resid'])] = self.unit_multipliers(uid, u)
+                multipliers[str(u['resid'])], crit[str(u['resid'])] = self.unit_multipliers(uid, u)
         multipliers = {k: v for k, v in multipliers.items() if v}
+        crit = {k: v for k, v in crit.items() if v}
         ability_names = {n for ups in out.values() for u in ups for a in u.get('attacks', [])
                          for k in ('any', 'none', 'all') for n in a['filter'][k]}
-        ability_names |= {n for ms in multipliers.values() for m in ms for k in ('any', 'none', 'all') for n in m['filter'][k]}
+        ability_names |= {n for ms in list(multipliers.values()) + list(crit.values()) for m in ms
+                          for k in ('any', 'none', 'all') for n in m['filter'][k]}
         units, abilities, by = {}, {}, self.ability_resources()
         for u in dump_units:
             uid = hexid(u['resid'])
@@ -343,13 +360,21 @@ class Enchantments:
         for aid in self.granted:    # an enchantment's other modifiers can apply to the ability it gives (Ice Nova)
             slug = site_slugs[aid.lower()]
             abilities.setdefault(slug, sorted(n for n in (g.name(r) for n, r in refs(fields(g.node(aid)).get('Requisites'))) if n in ability_names))
-        return {'enchantments': out, 'units': units, 'abilities': abilities, 'multipliers': multipliers}
+        # the abilities' own critical hit chance, every ability of the site's (an item's Trueshot, Bloody Edge)
+        ability_crit = {}
+        for a in read(site, 'Data', 'EN', 'Abilities.json') + read(site, 'Data', 'GEN', 'LinkedAbilities.json'):
+            aid = self.item_ability_of(a['slug'], by)
+            if aid and a['slug'] not in ability_crit and self.ability_crit(aid):
+                ability_crit[a['slug']] = self.ability_crit(aid)
+        return {'enchantments': out, 'units': units, 'abilities': abilities, 'multipliers': multipliers,
+                'crit': crit, 'ability_crit': ability_crit}
 
     def unit_multipliers(self, uid, dump_unit):
-        """the damage multipliers a unit has of its own, whatever the hit: [{filter, multiplier}], those of one ability
-        modifier added up (Mythic Unit - Group's x1.1 to weapon attacks). Its properties, and the groups the dump lists
-        as its passives (a class's group: the Mythic one comes no other way); not what applies only sometimes"""
-        g, out, seen, stack = self.g, [], set(), []
+        """the damage multipliers and critical hit chance a unit has of its own, whatever the hit: ([{filter,
+        multiplier}], [{filter, crit}]), those of one ability modifier added up (Mythic Unit - Group's x1.1 to weapon
+        attacks; Critical Chance: Base Attack's +10%). Its properties, and the groups the dump lists as its passives (a
+        class's group: the Mythic one comes no other way); not what applies only sometimes"""
+        g, out, crits, seen, stack = self.g, [], [], set(), []
         f = fields(g.node(uid))
         for key in ('Properties', 'Upgrades'):
             stack += [p for n, p in refs(f.get(key))]
@@ -363,16 +388,39 @@ class Enchantments:
             for key in ('Properties', 'List', 'Unit Upgrade Link'):
                 stack += [q for n, q in refs(pf.get(key))]
             if g.cls(p) != 'TUnitAbilityModifierProperty': continue
-            m = 1.0
+            m, crit = 1.0, 0
             for n, mod in refs(pf.get('Modifiers')):
-                if mod in g.raw and g.cls(mod) == 'TDamageMultiplierAbilityModifier' and self.unconditional(mod):
-                    mf = fields(g.node(mod))
-                    if self.empty(mf.get('Damage Channel Filter')): m += num(mf.get('Multiplier')) - 1
+                if mod not in g.raw or not self.unconditional(mod): continue
+                mf = fields(g.node(mod))
+                if g.cls(mod) == 'TDamageMultiplierAbilityModifier' and self.empty(mf.get('Damage Channel Filter')):
+                    m += num(mf.get('Multiplier')) - 1
+                elif g.cls(mod) == 'TCriticalChanceAbilityModifier':
+                    crit += crit_percent(mf)
+            own = {'filter': self.filter(pf.get('Requisite Filter'))}
+            if (value(pf.get('Ability Type Filter')) or 'Any') != 'Any': own['ability_type'] = value(pf.get('Ability Type Filter'))
             if round(m, 4) != 1:
-                own = {'filter': self.filter(pf.get('Requisite Filter')), 'multiplier': round(m, 4)}
-                if (value(pf.get('Ability Type Filter')) or 'Any') != 'Any': own['ability_type'] = value(pf.get('Ability Type Filter'))
-                out.append(own)
-        return out
+                out.append(dict(own, multiplier=round(m, 4)))
+            if crit:
+                crits.append(dict(own, crit=crit))
+        return out, crits
+
+    def ability_crit(self, aid):
+        """an ability's own critical hit chance in percent, whatever the hit (Trueshot's 20); 0 for what is no
+        ability (LinkedAbilities' passives by id: the Champion Medal's crit property)"""
+        if self.g.cls(aid) != 'TAbilityProperty': return 0
+        return sum(crit_percent(fields(self.g.node(m))) for n, m in refs(fields(self.g.node(aid)).get('Modifiers'))
+                   if m in self.g.raw and self.g.cls(m) == 'TCriticalChanceAbilityModifier' and self.unconditional(m))
+
+    def item_ability_of(self, slug, by):
+        """the game's ability of a dump slug, an item's too: its slug is the ability's and the item's
+        ("trueshot_ability_trueshot_item_tier_4": Trueshot - Ability), the longest start that names one"""
+        aid = self.ability_of(slug, by)
+        parts = slug.split('_')
+        for i in range(len(parts) - 1, 0, -1):
+            if aid: break
+            c = by.get('_'.join(parts[:i]))
+            aid = c[0] if c else None
+        return aid
 
 
 def main():
