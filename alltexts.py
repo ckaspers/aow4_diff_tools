@@ -284,6 +284,11 @@ def site_markup(s):
 NOT_ICONS = {'br', 'bullet', 'bulletlist'}
 
 
+# how far from a text's own resources the one with a tag it names is looked for: an enchantment spell's text reaches
+# its Chilled check through targeter, effect, side property, unit upgrade, group, modifier property and modifier
+NEAREST_DEPTH = 9
+
+
 def plain_name(s):
     """a name without the game's grammar marks ("Arcanium Ore^ns")"""
     return re.sub(r'\^\w*', '', s).strip()
@@ -316,6 +321,9 @@ class Texts:
         self._users, self._tagged, self._done, self._concepts, self._linked, self._shown_by = {}, {}, {}, {}, {}, {}
         self._defaults, self._elsewhere = {}, {}
         self.unused = set()    # texts with values to type in that no resource shows
+        self.guessed = set()   # texts with a value taken of several that differ, nothing telling which (stored)
+        self.typed_differ = set()
+        self._guess = False
 
     # ---- what the GLOBAL names stand for ----
     def _libraries(self):
@@ -366,9 +374,13 @@ class Texts:
         own = [r for r in found if r in context]
         if len(own) == 1: return own[0]
         # the nearest: Chaos Pulse reaches its Insanity through its plugin, randomizer and effect
-        for depth in range(2, 6):
+        for depth in range(2, NEAREST_DEPTH + 1):
             near = [r for r in found if r in self.linked(context, depth)]
-            if near: return near[0] if len(near) == 1 else None
+            if near:
+                # found by the links, not as the text's own: the nearest can be a Single Shot version, one link
+                # nearer than the repeating one the game shows (the Cryomancer Ascension's 90 for 30)
+                self._guess = True
+                return near[0] if len(near) == 1 else None
         return None
 
     def nearest(self, tag, context=()):
@@ -377,7 +389,7 @@ class Texts:
         if not context: return []
         own = [r for r in found if r in context]
         if own: return own
-        for depth in range(2, 6):
+        for depth in range(2, NEAREST_DEPTH + 1):
             near = [r for r in found if r in self.linked(context, depth)]
             if near: return near
         return []
@@ -478,6 +490,7 @@ class Texts:
         if not vals: vals = {self.stored_in(r, key) for r in self.tagged_all(tag)} - {None}
         # not a zero or a -1, "forever" (a summon's Turns To Live, a dispel's Num Things To Dispel)
         if len(vals) > 1: vals = {v for v in vals if int(v) > 0} or vals
+        if len(vals) > 1: self._guess = True
         return min(vals, key=lambda v: abs(int(v))) if vals else None
 
     def stored_in(self, rid, key):
@@ -551,7 +564,9 @@ class Texts:
                         for k, v in vals: typed[k][v] += 1
                         shown_by.append(rid)
             self._shown_by[mid] = shown_by
-            if len(seen) > 1: self.stats['texts whose resources differ'] += 1
+            if len(seen) > 1:
+                self.stats['texts whose resources differ'] += 1
+                self.typed_differ.add(mid)    # the most common of what they type in: a guess (Pandemonium's 90)
             if not seen: self.unused.add(mid)
             self._users[mid] = dict(seen.most_common(1)[0][0]) if seen else {}
             self._elsewhere[mid] = {k: c.most_common(1)[0][0] for k, c in typed.items() if k not in self._users[mid]}
@@ -593,13 +608,65 @@ class Texts:
         if mid not in self._done:
             s = self.T[mid]
             vals = self.users(mid) if needs_resource(s) else {}
+            self._guess = False
             s = self.fill(s, vals, mid, self._shown_by.get(mid, ()))
+            if self._guess or mid in self.typed_differ: self.guessed.add(mid)
             s = site_markup(s).replace('\0', '<eventColor>{').replace('\1', '}</eventColor>')
             self._done[mid] = s
         return self._done[mid]
 
 
-def build(texts_of, old):
+# a text's words and its numbers, markup and links aside: how a text of all.json is matched to the dump's rendering
+MARKUP = re.compile(r'\[hyperlink,[^\]]*\]|\[/hyperlink\]|<[^>]*>|\[[^\]]*\]')
+
+
+def words_and_numbers(s):
+    rest = MARKUP.sub(' ', s or '')
+    return ' '.join(re.findall(r'[A-Za-z]+', rest)).lower(), tuple(re.findall(r'\d+', rest))
+
+
+def renumber(s, numbers):
+    """s with the numbers outside its markup, in order, replaced by these"""
+    it = iter(numbers)
+    parts = re.split('(%s)' % MARKUP.pattern, s)
+    return ''.join(p if i % 2 else re.sub(r'\d+', lambda m: next(it), p) for i, p in enumerate(parts))
+
+
+def dump_renderings(site):
+    """the numbers the game's own texts in the dump (Data/EN, the DUMPALL files) show, by their words"""
+    out = collections.defaultdict(set)
+    def walk(x):
+        if isinstance(x, str):
+            if len(x) > 25 and re.search(r'\d', x):
+                w, n = words_and_numbers(x)
+                out[w].add(n)
+        elif isinstance(x, list):
+            for i in x: walk(i)
+        elif isinstance(x, dict):
+            for v in x.values(): walk(v)
+    for f in sorted(os.listdir(os.path.join(site, 'Data', 'EN'))):
+        if f.endswith('.json') and f not in ('all.json', 'concept_tooltips.json'):
+            walk(json.load(open(os.path.join(site, 'Data', 'EN', f), encoding='utf-8-sig')))
+    return out
+
+
+def as_rendered(texts_of, mid, text, dump):
+    """a text with a value guessed (stored: several resources share its tag, nothing telling which) takes the
+    numbers the game's own rendering of it in the dump has: the one, else the lowest of those, as the game shows a
+    shared text until one applies (2026-11-24: 23 such texts read 30% where the game's read 60% or 90%, a spell's
+    Chilled check being further from its text than alltexts looks; the shared status texts read 30% no ability has).
+    A value typed in or of one resource is the live game's and stays (the dump can be older than the mod)"""
+    if mid not in texts_of.guessed: return text
+    w, n = words_and_numbers(text)
+    shown = dump.get(w)
+    if not shown or n in shown or not n: return text
+    target = min(shown, key=lambda t: tuple(int(x) for x in t))
+    if len(target) != len(n): return text
+    texts_of.stats["guessed values taken from the game's own rendering in the dump"] += 1
+    return renumber(text, target)
+
+
+def build(texts_of, old, dump=None):
     """all.json's entries with every text the game has written anew, in all.json's own order (upstream's, which is
     no plain sort), new ids after them"""
     entries = {e['id']: dict(e) for e in old}
@@ -610,7 +677,7 @@ def build(texts_of, old):
         id_, field = mid.rsplit('@', 1)
         field = field.lower()
         if field in ('id', 'dlc'): continue
-        new = site_links(id_, texts_of(mid))
+        new = site_links(id_, as_rendered(texts_of, mid, texts_of(mid), dump or {}))
         if id_ not in entries: order.append(id_)
         e = entries.setdefault(id_, {'id': id_})
         # a text no resource shows has no values to fill in: the one the site has keeps its numbers
@@ -741,7 +808,8 @@ def main():
     texts = Texts(game, tooltips.load_texts(cfg['game'], os.path.dirname(acp) if acp else ''))
     path = os.path.join(site, 'Data', 'EN', 'all.json')
     old = json.load(open(path, encoding='utf-8-sig'))
-    new, counts = build(texts, old)
+    # ALLTEXTS_NO_DUMP=1: without the dump's numbers, to see how the rules alone do
+    new, counts = build(texts, old, {} if os.environ.get('ALLTEXTS_NO_DUMP') else dump_renderings(site))
     print('%d entries: %s' % (len(new), ', '.join('%d %s' % (n, k) for k, n in counts.items())))
     for k, n in texts.stats.items(): print('  %d %s' % (n, k))
     if texts.unresolved:

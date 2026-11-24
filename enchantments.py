@@ -189,12 +189,27 @@ class Enchantments:
                 return False
         return not refs(f.get('Count Property Link')) and not refs(f.get('Multiply By Attacker Property'))
 
-    def text(self, rid, field):
+    def text(self, rid, field, context=None):
         """a text link of a resource filled in with its own values, in the site's markup (as all.json's): the
-        Single Shot and the repeating version of a modifier share a text, each with its number"""
-        t = self.T.link_text(rid, field)
+        Single Shot and the repeating version of a modifier share a text, each with its number. context: the
+        resources whose values are the text's own (default: the resource itself)"""
+        if context is None:
+            t = self.T.link_text(rid, field)
+        else:
+            link = fields(self.g.node(rid)).get(field)
+            mid = msgid(link) if link else None
+            if not mid or mid not in self.T.T: return None
+            found = tooltips.links(link)
+            vals = {k: v for k, v in found[0][2] if v not in (None, '')} if found else {}
+            t = self.T.fill(self.T.T[mid], vals, mid, tuple(context))
         if not t: return None
         return alltexts.site_markup(t).replace('\0', '<eventColor>{').replace('\1', '}</eventColor>')
+
+    def own_resources(self, up):
+        """what an enchantment's upgrade reaches, its modifiers' checks and effects included: a passive's text takes
+        its values from these, the lowest of its versions (a repeating attack's 60%, not the Single Shot's 90%), as
+        the game shows it"""
+        return {r for r in self.T.linked(set(self.closure(up)) | {up}, 3) if r}
 
     def modifiers(self, node, only_own=False):
         """what a list of ability modifiers does to the abilities it applies to:
@@ -252,7 +267,7 @@ class Enchantments:
                 e['passives'].append({'slug': site_slugs[p.lower()]}); continue
             name = self.text(p, 'Screen Name')
             if name:
-                e['passives'].append({'name': name, 'text': self.text(p, 'Screen Description')})
+                e['passives'].append({'name': name, 'text': self.text(p, 'Screen Description', self.own_resources(up))})
         for p in self.closure(up):
             c, pf = g.cls(p), fields(g.node(p))
             if c == 'TAbilityProperty':
