@@ -10,15 +10,17 @@ the first .acp in the Mods folder.
                   (most give one; Dormant Enchantment one per class), each:
                   filter      {any, none, all}: the unit requisites the upgrade asks (any of, none of, all of)
                   passives    what the unit panel shows: {slug} of a property the site's abilities have, else {name,
-                              text}, the game's text ids (all.json's id@field) of the property's Screen Name and
-                              Screen Description; none: the site shows the spell itself
-                  abilities   slugs of the abilities it gives (in Abilities.json or LinkedAbilities.json)
+                              text}: the property's Screen Name and Screen Description, filled in with its own values
+                              (the site's markup, as all.json's); none: the site shows the spell itself
+                  abilities   [{slug, per_tier}]: the abilities it gives (in Abilities.json or LinkedAbilities.json),
+                              with the damage they add for each tier of the unit (Ice Nova: +4 for each past the first)
                   stats       {hp, armor, resistance, status_resistance}: unconditional changes
                   resistances {damage type: n}: unconditional Damage Reduction, as the site's resistances
-                  attacks     [{filter {any, none, all} of ability requisites, damage (the dump's way: "4<damagefrost>
-                              </damagefrost> "), existing (only to the damage types the attack has), multiplier,
-                              range, accuracy, name (text id)}]: what its ability modifiers do to the abilities they
-                              apply to, only what applies whatever the target and the hit
+                  attacks     [{filter {any, none, all} of ability requisites, notes [{name, text}] (the lines the
+                              game's ability tooltip adds, whatever their conditions, each with its numbers), damage (the dump's
+                              way: "4<damagefrost></damagefrost> "), existing (only to the damage types the attack
+                              has), per_tier, multiplier, range, accuracy}]: what its ability modifiers do to the
+                              abilities they apply to; numbers only for what applies whatever the target and the hit
     units         {resid: [requisite, ...]}: each unit's requisites that some filter names
     abilities     {ability slug: [requisite, ...]}: the same for the abilities of the site's units
 
@@ -35,7 +37,7 @@ How the game links them (checked 2026-11-24 against the site's unit classes, whi
 """
 import argparse, collections, json, os, re, sys
 
-import aow4diff
+import aow4diff, alltexts, tooltips
 from citytree import Game, fields, refs, value, msgid, hexid
 
 DAMAGE = [('Physical', 'damagephysical'), ('Blight', 'damageblight'), ('Shock', 'damagelightning'),
@@ -75,19 +77,14 @@ def block(node):
     return out
 
 
-def text_id(link):
-    """a localized string link's msgid as all.json's id@field: 'TOME_CRYOMANCY@SKILL_3@NAME'"""
-    m = msgid(link)
-    return m if m and '@' in m else None
-
-
 class Enchantments:
-    def __init__(self, game, site):
-        self.g, self.site = game, site
+    def __init__(self, game, site, T):
+        self.g, self.site, self.T = game, site, T
         self.req_of_prop = collections.defaultdict(set)
         for r in game.of_class('TUnitRequisite'):
             for n, p in refs(fields(game.node(r)).get('Property Link')): self.req_of_prop[p].add(r)
         self.warn = []
+        self.granted = set()    # the abilities enchantments give: their requisites are written too
 
     # ---- units and abilities ----
     def props(self, rid, seen):
@@ -187,6 +184,54 @@ class Enchantments:
                 return False
         return not refs(f.get('Count Property Link')) and not refs(f.get('Multiply By Attacker Property'))
 
+    def text(self, rid, field):
+        """a text link of a resource filled in with its own values, in the site's markup (as all.json's): the
+        Single Shot and the repeating version of a modifier share a text, each with its number"""
+        t = self.T.link_text(rid, field)
+        if not t: return None
+        return alltexts.site_markup(t).replace('\0', '<eventColor>{').replace('\1', '}</eventColor>')
+
+    def modifiers(self, node, only_own=False):
+        """what a list of ability modifiers does to the abilities it applies to:
+        notes      [{name, text}]: the lines the game's ability tooltip shows (Effect Name, Effect Description) of those
+                   not kept out of it (Display In Ability Tooltips), whatever their conditions (Savage Strike on a
+                   critical hit; Dissonant)
+        damage     extra damage that applies whatever the hit (the dump's way of writing it); existing: only to the
+                   damage types the attack has (Adding Mode 2)
+        per_tier   {damage, skip_first, existing}: extra damage for each tier of the unit (Counting Mode Caster Tier)
+        multiplier, range, accuracy
+        only_own: an ability's own modifiers (Ice Nova's per-tier damage): what its card leaves out, its damage per tier"""
+        g, a, dmg, notes = self.g, {}, collections.Counter(), []
+        for n, m in refs(node):
+            if m not in g.raw: continue
+            mc, mf = g.cls(m), fields(g.node(m))
+            note = {'name': self.text(m, 'Effect Name'), 'text': self.text(m, 'Effect Description')}
+            if not only_own and value(mf.get('Display In Ability Tooltips')) != 'false' and note['name'] and note not in notes:
+                notes.append(note)
+            if not self.unconditional(m): continue
+            # Adding Mode (no names in the schema): 1 a random channel, 2 the channels the attack has
+            mode = value(mf.get('Adding Mode')) or '0'
+            if mc == 'TCountingExtraDamageAbilityModifier' and value(mf.get('Counting Mode')) == 'Caster Tier' and mode != '1':
+                d = block(mf.get('Damage'))
+                a['per_tier'] = {'damage': ''.join('%d<%s></%s> ' % (d[t], tag, tag) for t, tag in DAMAGE if d.get(t)),
+                                 'skip_first': value(mf.get('Skip First')) == 'true', 'existing': mode == '2'}
+            if only_own: continue
+            if mc == 'TExtraDamageAbilityModifier' and mode != '1':
+                if mode == '2': a['existing'] = True
+                dmg.update(block(mf.get('Damage')))
+            elif mc == 'TDamageMultiplierAbilityModifier' and self.empty(mf.get('Damage Channel Filter')) \
+                    and num(mf.get('Multiplier')) not in (0, 1):
+                a['multiplier'] = round(a.get('multiplier', 1) * num(mf.get('Multiplier')), 4)
+            elif mc == 'TRangeBoostingAbilityModifier' and num(mf.get('Range To Add')):
+                a['range'] = a.get('range', 0) + int(num(mf.get('Range To Add')))
+            elif mc == 'TAccuracyBoostingAbilityModifier' and num(mf.get('Accuracy Modifier')):
+                a['accuracy'] = a.get('accuracy', 0) + num(mf.get('Accuracy Modifier'))
+        if dmg:
+            a['damage'] = ''.join('%d<%s></%s> ' % (dmg[t], tag, tag) for t, tag in DAMAGE if dmg.get(t))
+        if notes:
+            a['notes'] = notes
+        return a
+
     def upgrade(self, up, site_slugs):
         g = self.g
         f = fields(g.node(up))
@@ -200,13 +245,17 @@ class Enchantments:
             if value(pf.get('Display in Unit Panel')) == 'false': continue
             if p.lower() in site_slugs:
                 e['passives'].append({'slug': site_slugs[p.lower()]}); continue
-            name = text_id(pf.get('Screen Name'))
+            name = self.text(p, 'Screen Name')
             if name:
-                e['passives'].append({'name': name, 'text': text_id(pf.get('Screen Description'))})
+                e['passives'].append({'name': name, 'text': self.text(p, 'Screen Description')})
         for p in self.closure(up):
             c, pf = g.cls(p), fields(g.node(p))
             if c == 'TAbilityProperty':
-                if p.lower() in site_slugs: e['abilities'].append(site_slugs[p.lower()])
+                if p.lower() in site_slugs:
+                    ab = {'slug': site_slugs[p.lower()]}
+                    ab.update(self.modifiers(pf.get('Modifiers'), only_own=True))   # its own per-tier damage
+                    e['abilities'].append(ab)
+                    self.granted.add(p)
                 else: self.warn.append('ability not on the site: %s' % g.name(p))
             elif c == 'TStatModifierProperty' and self.unconditional(p):
                 for key in ('Bonus', 'Stat Modifiers', 'Stats'):
@@ -224,25 +273,7 @@ class Enchantments:
                 stats['status_resistance'] += num(pf.get('Resistance'))
             elif c == 'TUnitAbilityModifierProperty':
                 a = {'filter': self.filter(pf.get('Requisite Filter'))}
-                dmg = collections.Counter()
-                for n, m in refs(pf.get('Modifiers')):
-                    if m not in g.raw or not self.unconditional(m): continue
-                    mc, mf = g.cls(m), fields(g.node(m))
-                    if mc == 'TExtraDamageAbilityModifier':
-                        # Adding Mode (no names in the schema): 1 a random channel, 2 the channels the attack has
-                        mode = value(mf.get('Adding Mode')) or '0'
-                        if mode == '1': continue
-                        if mode == '2': a['existing'] = True
-                        dmg.update(block(mf.get('Damage')))
-                        a.setdefault('name', text_id(mf.get('Effect Name')))
-                    elif mc == 'TDamageMultiplierAbilityModifier' and self.empty(mf.get('Damage Channel Filter'))                             and num(mf.get('Multiplier')) not in (0, 1):
-                        a['multiplier'] = round(a.get('multiplier', 1) * num(mf.get('Multiplier')), 4)
-                    elif mc == 'TRangeBoostingAbilityModifier' and num(mf.get('Range To Add')):
-                        a['range'] = a.get('range', 0) + int(num(mf.get('Range To Add')))
-                    elif mc == 'TAccuracyBoostingAbilityModifier' and num(mf.get('Accuracy Modifier')):
-                        a['accuracy'] = a.get('accuracy', 0) + num(mf.get('Accuracy Modifier'))
-                if dmg:
-                    a['damage'] = ''.join('%d<%s></%s> ' % (dmg[t], tag, tag) for t, tag in DAMAGE if dmg.get(t))
+                a.update(self.modifiers(pf.get('Modifiers')))
                 if len(a) > 1: e['attacks'].append(a)
         e['stats'] = {k: int(v) for k, v in stats.items() if v}
         e['resistances'] = {k: int(v) for k, v in res.items() if v}
@@ -278,6 +309,9 @@ class Enchantments:
                 if not aid:
                     self.warn.append('ability not found in the game: %s' % a['slug']); continue
                 abilities[a['slug']] = sorted(n for n in (g.name(r) for n, r in refs(fields(g.node(aid)).get('Requisites'))) if n in ability_names)
+        for aid in self.granted:    # an enchantment's other modifiers can apply to the ability it gives (Ice Nova)
+            slug = site_slugs[aid.lower()]
+            abilities.setdefault(slug, sorted(n for n in (g.name(r) for n, r in refs(fields(g.node(aid)).get('Requisites'))) if n in ability_names))
         return {'enchantments': out, 'units': units, 'abilities': abilities}
 
 
@@ -291,7 +325,8 @@ def main():
     site = args.site or cfg.get('site')
     if not site: sys.exit('which website? pass --site or set "site" in config.json')
     acp = None if args.no_mod else args.acp or (aow4diff.mod_acps(cfg) or [None])[0]
-    E = Enchantments(Game(cfg, acp), site)
+    game = Game(cfg, acp)
+    E = Enchantments(game, site, alltexts.Texts(game, tooltips.load_texts(cfg['game'], os.path.dirname(acp) if acp else '')))
     out = E.build()
     path = os.path.join(site, 'Data', 'GEN', 'UnitEnchantments.json')
     with open(path, 'w', encoding='utf-8', newline='\n') as f:
