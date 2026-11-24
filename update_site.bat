@@ -1,5 +1,5 @@
 @echo off
-rem After a new DUMPALL dump is copied into the website: its texts, unit categories, city tree, magic materials, ancient wonders, world map sites, spells, Architect attacks, units' figures, hero skills' and items' sources, status effects and what of the abilities no player meets, from the
+rem After a new DUMPALL dump is copied into the website: its texts, unit categories, city tree, magic materials, ancient wonders, world map sites, spells, Architect attacks, units' figures and summoned upkeep, hero skills' and items' sources, status effects and what of the abilities no player meets, from the
 rem live game with the mod. In this order: alltexts.py leaves the abilities abilities.py writes out of the concept
 rem tooltips.
 cd /d "%~dp0"
@@ -16,7 +16,7 @@ where py >nul 2>nul && set PY=py -3
 %PY% worldmap.py || goto failed
 %PY% spells.py || goto failed
 %PY% affinityattacks.py || goto failed
-%PY% unitfigures.py || goto failed
+%PY% unitextras.py || goto failed
 %PY% heroskills.py || goto failed
 %PY% heroitems.py || goto failed
 %PY% statuseffects.py || goto failed
