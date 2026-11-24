@@ -19,7 +19,8 @@ the first .acp in the Mods folder.
                   attacks     [{filter {any, none, all} of ability requisites, notes [{name, text}] (the lines the
                               game's ability tooltip adds, whatever their conditions, each with its numbers), damage (the dump's
                               way: "4<damagefrost></damagefrost> "), existing (only to the damage types the attack
-                              has), per_tier, multiplier, range, accuracy}]: what its ability modifiers do to the
+                              has), per_tier, multiplier, range, accuracy, ability_type (Repeating or Single
+                              Action: only to such attacks)}]: what its ability modifiers do to the
                               abilities they apply to; numbers only for what applies whatever the target and the hit
     units         {resid: [requisite, ...]}: each unit's requisites that some filter names
     abilities     {ability slug: [requisite, ...]}: the same for the abilities of the site's units
@@ -293,6 +294,8 @@ class Enchantments:
                 stats['status_resistance'] += num(pf.get('Resistance'))
             elif c == 'TUnitAbilityModifierProperty':
                 a = {'filter': self.filter(pf.get('Requisite Filter'))}
+                # Ability Type Filter: Any, Repeating or Single Action (Frenzying Imbuement's Life Steal: 5, 10)
+                if (value(pf.get('Ability Type Filter')) or 'Any') != 'Any': a['ability_type'] = value(pf.get('Ability Type Filter'))
                 a.update(self.modifiers(pf.get('Modifiers')))
                 if len(a) > 1: e['attacks'].append(a)
         e['stats'] = {k: int(v) for k, v in stats.items() if v}
@@ -366,7 +369,9 @@ class Enchantments:
                     mf = fields(g.node(mod))
                     if self.empty(mf.get('Damage Channel Filter')): m += num(mf.get('Multiplier')) - 1
             if round(m, 4) != 1:
-                out.append({'filter': self.filter(pf.get('Requisite Filter')), 'multiplier': round(m, 4)})
+                own = {'filter': self.filter(pf.get('Requisite Filter')), 'multiplier': round(m, 4)}
+                if (value(pf.get('Ability Type Filter')) or 'Any') != 'Any': own['ability_type'] = value(pf.get('Ability Type Filter'))
+                out.append(own)
         return out
 
 
