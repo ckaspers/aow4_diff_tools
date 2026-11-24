@@ -36,7 +36,7 @@ python aow4diff.py after-update
 
 For an aow4db-style website, once the patched game has made a new DUMPALL dump (with the mod loaded) and
 it is copied into the site: double-click `update_site.bat`. It runs `abilities.py`, `alltexts.py`, `spawnsets.py`, `tmlicons.py`,
-`realmtraits.py`, `citytree.py`, `magicmaterials.py`, `ancientwonders.py`, `worldmap.py`, `spells.py`, `affinityattacks.py`, `heroskills.py`, `heroitems.py`, `statuseffects.py` and `inplay.py` in that order (see below). It is a separate step because the dump only exists after the
+`realmtraits.py`, `citytree.py`, `magicmaterials.py`, `ancientwonders.py`, `worldmap.py`, `spells.py`, `affinityattacks.py`, `unitfigures.py`, `heroskills.py`, `heroitems.py`, `statuseffects.py` and `inplay.py` in that order (see below). It is a separate step because the dump only exists after the
 game has run.
 
 Steam updates the game in place, so the snapshot has to exist **before** an update arrives.
@@ -60,6 +60,7 @@ Other commands:
 | `python worldmap.py --site PATH [--acp mod.acp \| --no-mod]` | Infestations, Landmarks and Cosmic and Oceanic Happenings for the same website, and their icons |
 | `python spells.py --site PATH [--acp mod.acp \| --no-mod]` | Spells and siege projects for the same website (run after `worldmap.py`, whose lists it links to) |
 | `python affinityattacks.py --site PATH [--acp mod.acp \| --no-mod]` | The Architect units' attacks by affinity, which the dump gets wrong, for the same website |
+| `python unitfigures.py --site PATH [--acp mod.acp \| --no-mod]` | How many figures (models) each unit has, from its formation, for the same website: the dump's own count is wrong for some formations |
 | `python heroskills.py --site PATH [--acp mod.acp \| --no-mod]` | Where a hero skill outside the skill trees comes from, and which skills no player can get, for the same website (run after `ancientwonders.py`, whose wonders it names) |
 | `python heroitems.py --site PATH [--acp mod.acp \| --no-mod] [--verbose]` | Where each hero item comes from (loot, a shop, a dwelling, a culture's action, a story, a starting loadout, a culture's default gear, a faction mount), for the same website (run after `ancientwonders.py`); `--verbose` lists what holds an item's loot that the tool doesn't know |
 | `python statuseffects.py --site PATH [--acp mod.acp \| --no-mod]` | The status effects for the same website: whether the game counts each as negative or positive, how many times it stacks, what it counters, and whether a dispel removes it |
