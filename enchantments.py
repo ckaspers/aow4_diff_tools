@@ -23,6 +23,11 @@ the first .acp in the Mods folder.
                               abilities they apply to; numbers only for what applies whatever the target and the hit
     units         {resid: [requisite, ...]}: each unit's requisites that some filter names
     abilities     {ability slug: [requisite, ...]}: the same for the abilities of the site's units
+    multipliers   {resid: [{filter, multiplier}]}: a unit's own damage multipliers, whatever the hit (a Mythic unit's
+                  x1.1 to weapon attacks): the dump's damage has them; the site takes them out, adds an enchantment's
+                  damage, and puts them back with the enchantment's. In the game the bonuses add up and the result is
+                  rounded up: a Mythic Kraken's Melee Strike, 20 raw (22), with Empowered Beasts' +20% and Force of
+                  Nature's +4 Blight, is 20 x 1.3 = 26 and 4 x 1.3 = 5.2, 6 (the maintainer's screenshots, 2026-11-24)
 
 How the game links them (checked 2026-11-24 against the site's unit classes, which match exactly):
 - A unit enchantment is a spell with Is Unit Enchantment. Its targeters' effects give a side property
@@ -295,10 +300,18 @@ class Enchantments:
             out[s['id']] = [self.upgrade(u, site_slugs) for u in ups]
         # the requisites the filters name, for each unit and each of its abilities
         unit_names = {n for ups in out.values() for u in ups for k in ('any', 'none', 'all') for n in u['filter'][k]}
+        dump_units = read(site, 'Data', 'EN', 'Units.json')
+        multipliers = {}
+        for u in dump_units:
+            uid = hexid(u['resid'])
+            if uid in g.raw and str(u['resid']) not in multipliers:
+                multipliers[str(u['resid'])] = self.unit_multipliers(uid, u)
+        multipliers = {k: v for k, v in multipliers.items() if v}
         ability_names = {n for ups in out.values() for u in ups for a in u.get('attacks', [])
                          for k in ('any', 'none', 'all') for n in a['filter'][k]}
+        ability_names |= {n for ms in multipliers.values() for m in ms for k in ('any', 'none', 'all') for n in m['filter'][k]}
         units, abilities, by = {}, {}, self.ability_resources()
-        for u in read(site, 'Data', 'EN', 'Units.json'):
+        for u in dump_units:
             uid = hexid(u['resid'])
             if uid not in g.raw: continue
             if str(u['resid']) not in units:    # a unit per sub-culture is in the dump once each, with its own abilities
@@ -312,7 +325,34 @@ class Enchantments:
         for aid in self.granted:    # an enchantment's other modifiers can apply to the ability it gives (Ice Nova)
             slug = site_slugs[aid.lower()]
             abilities.setdefault(slug, sorted(n for n in (g.name(r) for n, r in refs(fields(g.node(aid)).get('Requisites'))) if n in ability_names))
-        return {'enchantments': out, 'units': units, 'abilities': abilities}
+        return {'enchantments': out, 'units': units, 'abilities': abilities, 'multipliers': multipliers}
+
+    def unit_multipliers(self, uid, dump_unit):
+        """the damage multipliers a unit has of its own, whatever the hit: [{filter, multiplier}], those of one ability
+        modifier added up (Mythic Unit - Group's x1.1 to weapon attacks). Its properties, and the groups the dump lists
+        as its passives (a class's group: the Mythic one comes no other way); not what applies only sometimes"""
+        g, out, seen, stack = self.g, [], set(), []
+        f = fields(g.node(uid))
+        for key in ('Properties', 'Upgrades'):
+            stack += [p for n, p in refs(f.get(key))]
+        for p in dump_unit.get('primary_passives', []) + dump_unit.get('secondary_passives', []):
+            if re.fullmatch(r'[0-9a-fA-F]{16}', p['slug']): stack.append(p['slug'].upper())
+        while stack:
+            p = stack.pop()
+            if p in seen or p not in g.raw or g.cls(p) in SOMETIMES: continue
+            seen.add(p)
+            pf = fields(g.node(p))
+            for key in ('Properties', 'List', 'Unit Upgrade Link'):
+                stack += [q for n, q in refs(pf.get(key))]
+            if g.cls(p) != 'TUnitAbilityModifierProperty': continue
+            m = 1.0
+            for n, mod in refs(pf.get('Modifiers')):
+                if mod in g.raw and g.cls(mod) == 'TDamageMultiplierAbilityModifier' and self.unconditional(mod):
+                    mf = fields(g.node(mod))
+                    if self.empty(mf.get('Damage Channel Filter')): m += num(mf.get('Multiplier')) - 1
+            if round(m, 4) != 1:
+                out.append({'filter': self.filter(pf.get('Requisite Filter')), 'multiplier': round(m, 4)})
+        return out
 
 
 def main():
