@@ -371,6 +371,17 @@ class Texts:
             if near: return near[0] if len(near) == 1 else None
         return None
 
+    def nearest(self, tag, context=()):
+        """the resources with DataStoreTag tag nearest the text's own (as tagged), however many: [] if none links"""
+        found = self.tagged_all(tag)
+        if not context: return []
+        own = [r for r in found if r in context]
+        if own: return own
+        for depth in range(2, 6):
+            near = [r for r in found if r in self.linked(context, depth)]
+            if near: return near
+        return []
+
     def linked(self, rids, depth=2):
         """the resources these link to, and the ones those link to, depth links on"""
         key = (tuple(sorted(rids)), depth)
@@ -461,7 +472,10 @@ class Texts:
         rid = self.tagged(tag, context)
         v = self.stored_in(rid, key) if rid else None
         if v is not None: return v
-        vals = {self.stored_in(r, key) for r in self.tagged_all(tag)} - {None}
+        # of those the text's own resources link to, when it has some (Ice Focus' text: its two Chilled checks, 60
+        # and 90, of the five CHILLED_RESISTANCE has: 60, as the game's own text says; was 30, the lowest of all)
+        vals = {self.stored_in(r, key) for r in self.nearest(tag, context)} - {None}
+        if not vals: vals = {self.stored_in(r, key) for r in self.tagged_all(tag)} - {None}
         # not a zero or a -1, "forever" (a summon's Turns To Live, a dispel's Num Things To Dispel)
         if len(vals) > 1: vals = {v for v in vals if int(v) > 0} or vals
         return min(vals, key=lambda v: abs(int(v))) if vals else None
