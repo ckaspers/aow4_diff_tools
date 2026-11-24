@@ -1,5 +1,8 @@
 # Publishes the browser version (web/) to GitHub Pages on every push to main.
 # Only the page, its worker and the files it loads are served (see web/build_site.py).
+# Building and deploying are separate jobs, so "Re-run failed jobs" after a failed
+# deployment re-runs only the deployment: deploy-pages refuses a run holding two
+# github-pages artifacts, which a re-run of a single combined job would upload.
 name: Pages
 
 on:
@@ -17,17 +20,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 web/build_site.py _site
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
   deploy:
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - run: python3 web/build_site.py _site
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
